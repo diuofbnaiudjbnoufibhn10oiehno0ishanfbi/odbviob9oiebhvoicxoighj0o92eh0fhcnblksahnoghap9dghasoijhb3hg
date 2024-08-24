@@ -1,0 +1,8 @@
+import pydirectinput, time, random
+
+def safety_click(x, y):
+	pydirectinput.moveTo(x, y)
+	time.sleep(random.uniform(0.01, 0.05))
+	pydirectinput.click()
+	
+safety_click(500, 400)
