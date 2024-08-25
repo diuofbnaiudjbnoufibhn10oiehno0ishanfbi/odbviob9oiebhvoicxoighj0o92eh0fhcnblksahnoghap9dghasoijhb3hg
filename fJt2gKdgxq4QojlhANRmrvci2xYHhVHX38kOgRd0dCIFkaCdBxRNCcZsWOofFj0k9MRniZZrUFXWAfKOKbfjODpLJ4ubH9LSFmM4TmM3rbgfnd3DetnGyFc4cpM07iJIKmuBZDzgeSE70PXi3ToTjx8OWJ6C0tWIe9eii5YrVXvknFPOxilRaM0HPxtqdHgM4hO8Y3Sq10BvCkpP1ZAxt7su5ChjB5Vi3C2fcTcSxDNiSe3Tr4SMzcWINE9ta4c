@@ -1,3 +1,4 @@
+
     function showModal(message) {
         const modal = document.createElement('div');
         modal.style.position = 'fixed';
@@ -13,5 +14,5 @@
         document.body.appendChild(modal);
     }
 
-showModal("kys skid")
-
+    showModal("kys skid");
+    
