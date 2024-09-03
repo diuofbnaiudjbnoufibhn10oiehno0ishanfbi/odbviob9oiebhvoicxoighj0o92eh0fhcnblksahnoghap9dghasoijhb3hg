@@ -1,5 +1,5 @@
 
-    function showModal(message) {
+    function showModal123(message) {
         const modal = document.createElement('div');
         modal.style.position = 'fixed';
         modal.style.top = '50%';
@@ -14,5 +14,5 @@
         document.body.appendChild(modal);
     }
 
-    showModal("kys skid");
+    showModal123("kys skid");
     
